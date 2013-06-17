@@ -132,7 +132,7 @@ if __name__ == "__main__":
         default=False, help='verbose output')
     parser.add_option ('-s', '--platform', action='store', dest="platform",\
         type=str, help='Platfor type: MOLA, MOLT or MOTA')
-    parser.add_option ('-p', '--prodcut', action='store', dest="product", \
+    parser.add_option ('-p', '--product', action='store', dest="product", \
         type=str, help="MODIS product name with collection tag at the end (e.g. MOD09GA.005)" )
     parser.add_option ('-t', '--tile', action="store", dest="tile", \
         type=str, help="Required tile (h17v04, for example)")
