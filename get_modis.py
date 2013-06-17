@@ -91,7 +91,7 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
     -------
     Nothing
     """
-    headers = { 'User-Agent' : 'get_modis Python 1.0' }
+    headers = { 'User-Agent' : 'get_modis Python 1.0.0' }
     if not os.path.exists ( out_dir ):
         if verbose:
             log.info("Creating outupt dir %s" % out_dir )
