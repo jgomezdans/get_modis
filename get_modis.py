@@ -2,88 +2,45 @@
 
 """
 SYNOPSIS
-
     
-    
+./get_modis.py [-h,--help] [--verbose, -v] [--platform=PLATFORM, -s PLATFORM] \
+    [--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE] [--year=YEAR, -y YEAR] \
+    [--output=DIR_OUT, -o DIR_OUT] [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
 
 DESCRIPTION
 
-  This program receives a metadata file in USGS format, and it then applies
-  the Wang atmospheric correction method based on a minimimal set of input
-  parameters. It will take the original data, subset it if required using a
-  geographical box in projection units (UTM). It will produce datasets with
-  the TOA radiance (e.g. `LE72040312010347EDC00_ROI_B2_TOARAD.tif`), as well
-  as a datafile with the visible bands with atmospheric correction  (filename
-  is e.g. `LE72040312010347EDC00_WANG_VIS_WLRAD.tif`). 
+A program to download MODIS data from the USGS website using the HTTP
+transport. This program is able to download daily, monthly, 8-daily, etc products
+for a given year, it only requires the product names (including the collection number), 
+the year, the MODIS reference tile and additionally, where to save the data to, and
+whether to verbose. The user may also select a temporal period in terms of days of year.
 
 EXAMPLES
-            $ ./do_atcorr.py -H 0.5 -i data/LE72040312010347EDC00_MTL.txt \
-                --roi 578745.000,4650765.000,608535.000,4618935.000 -v
-                
-            Sat Jun 15 15:19:56 2013
-            1 data/LE72040312010347EDC00_ROI_B1.vrt data/LE72040312010347EDC00_B1.TIF
-            Input file size is 8081, 7151
-            Computed -srcwin 3822 2685 993 1061 from projected window.
-            2 data/LE72040312010347EDC00_ROI_B2.vrt data/LE72040312010347EDC00_B2.TIF
-            Input file size is 8081, 7151
-            Computed -srcwin 3822 2685 993 1061 from projected window.
-            3 data/LE72040312010347EDC00_ROI_B3.vrt data/LE72040312010347EDC00_B3.TIF
-            Input file size is 8081, 7151
-            Computed -srcwin 3822 2685 993 1061 from projected window.
-            4 data/LE72040312010347EDC00_ROI_B4.vrt data/LE72040312010347EDC00_B4.TIF
-            Input file size is 8081, 7151
-            Computed -srcwin 3822 2685 993 1061 from projected window.
-            5 data/LE72040312010347EDC00_ROI_B5.vrt data/LE72040312010347EDC00_B5.TIF
-            Input file size is 8081, 7151
-            Computed -srcwin 3822 2685 993 1061 from projected window.
-            7 data/LE72040312010347EDC00_ROI_B7.vrt data/LE72040312010347EDC00_B7.TIF
-            Input file size is 8081, 7151
-            Computed -srcwin 3822 2685 993 1061 from projected window.
-            Start reading data/LE72040312010347EDC00_ROI_B1.vrt
-            Using blocksize 128 x 128
-            Creating output data/LE72040312010347EDC00_ROI_B1_TOARAD.tif
-            Start reading data/LE72040312010347EDC00_ROI_B2.vrt
-            Using blocksize 128 x 128
-            Creating output data/LE72040312010347EDC00_ROI_B2_TOARAD.tif
-            Start reading data/LE72040312010347EDC00_ROI_B3.vrt
-            Using blocksize 128 x 128
-            Creating output data/LE72040312010347EDC00_ROI_B3_TOARAD.tif
-            Start reading data/LE72040312010347EDC00_ROI_B4.vrt
-            Using blocksize 128 x 128
-            Creating output data/LE72040312010347EDC00_ROI_B4_TOARAD.tif
-            Start reading data/LE72040312010347EDC00_ROI_B5.vrt
-            Using blocksize 128 x 128
-            Creating output data/LE72040312010347EDC00_ROI_B5_TOARAD.tif
-            Start reading data/LE72040312010347EDC00_ROI_B7.vrt
-            Using blocksize 128 x 128
-            Creating output data/LE72040312010347EDC00_ROI_B7_TOARAD.tif
-                    Theta_i=22.545988, Phi_i=160.273075
-            Lambdas:  [   482.5    565.     660.     837.5   1650.   11450.    2220. ]
-            LE72040312010347EDC00_MTL.txt
-            Doy: 347, Year: 2010
-            Using default O3 conc file, O3 conc: 265.000000
-            Starting interpolation...
-            Interpolation done...
-            Creating output data/LE72040312010347EDC00_WANG_VIS_WLRAD.tif
-            Sat Jun 15 15:23:22 2013
-            TOTAL TIME IN MINUTES: 3.43263668219
 
+    The following example downloads daily surface reflectance from the TERRA platform for
+    tile h17v04 for 2004, between DoY 153 and 243:
+    
+    $ ./get_modis.py -v -p MOD09GA.005 -s MOLT -y 2004 -t h17v04 -o /tmp/ -b 153 -e 243
+    
+    The script will also work with monthly or 8-daily composites. Here's how you 
+    download the monthly MCD45A1 (burned area) product for the same period:
+    
+    $./get_modis.py -v -p MCD45A1.005 -s MOTA -y 2004 -t h17v04 -o /tmp/ -b 153 -e 243
+        
 
 EXIT STATUS
-
-    -1 if numpy and/or GDAL aren't present
+    No exit status yet, can't be bothered.
 
 AUTHOR
 
     J Gomez-Dans <j.gomez-dans@ucl.ac.uk>
+    See also http://github.com/jgomezdans/get_modis/
 
-NOTE
-    
-    The program has not been verified. Needs severe testing!!!!!!!!
 """
+import optparse
 import os
 import urllib2
-import datetime
+import time
 import calendar
 import shutil
 import logging
@@ -97,7 +54,7 @@ log.addHandler(out_hdlr)
 log.setLevel(logging.INFO)
 
 
-def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = None,  \
+def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  \
     base_url="http://e4ftl01.cr.usgs.gov", out_dir=".", verbose=False ):
 
     """Download MODIS products for a given tile, year & period of interest
@@ -139,7 +96,7 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = None,
         if verbose:
             log.info("Creating outupt dir %s" % out_dir )
         os.mkdirs ( out_dir )
-    if doy_end is None:
+    if doy_end == -1:
         if calendar.isleap ( year ):
             doy_end = 367
         else:
@@ -150,18 +107,50 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = None,
     url = "%s/%s/%s/" % ( base_url, platform, product )
     for date in dates:
         req = urllib2.Request ( "%s/%s" % ( url, date), None, headers)
-        html = urllib2.urlopen(req).readlines()
-        for l in html:
-            if l.find( tile ) >=0  and l.find(".hdf") >= 0 and l.find(".hdf.xml") < 0:
-                fname = l.split("href=")[1].split(">")[0].strip('"')
-                if verbose:
-                    log.info ( "Getting %s..... " % fname )
-                req = urllib2.Request ( "%s/%s/%s" % ( url, date, fname), None, headers)
-                with open ( os.path.join( out_dir, fname ), 'wb' ) as fp:
-                    shutil.copyfileobj(urllib2.urlopen(req), fp)
-                if verbose:
-                    log.info("Done!")
+        try:
+            html = urllib2.urlopen(req).readlines()
+            for l in html:
+                if l.find( tile ) >=0  and l.find(".hdf") >= 0 and l.find(".hdf.xml") < 0:
+                    fname = l.split("href=")[1].split(">")[0].strip('"')
+                    if verbose:
+                        log.info ( "Getting %s..... " % fname )
+                    req = urllib2.Request ( "%s/%s/%s" % ( url, date, fname), None, headers)
+                    with open ( os.path.join( out_dir, fname ), 'wb' ) as fp:
+                        shutil.copyfileobj(urllib2.urlopen(req), fp)
+                    if verbose:
+                        log.info("Done!")
+        except urllib2.URLError:
+            log.info("Could not find data for %s(%s) for %s" % ( product, platform, date ))
     if verbose:
         log.info("Completely finished downlading all there was")
+        
+
 if __name__ == "__main__":
-    get_modisfiles ( "MOLT", "MOD09GA.005", 2004, "h17v04", verbose=True )
+    parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(), \
+        usage=globals()['__doc__'])
+    parser.add_option ('-v', '--verbose', action='store_true', \
+        default=False, help='verbose output')
+    parser.add_option ('-s', '--platform', action='store', dest="platform",\
+        type=str, help='Platfor type: MOLA, MOLT or MOTA')
+    parser.add_option ('-p', '--prodcut', action='store', dest="product", \
+        type=str, help="MODIS product name with collection tag at the end (e.g. MOD09GA.005)" )
+    parser.add_option ('-t', '--tile', action="store", dest="tile", \
+        type=str, help="Required tile (h17v04, for example)")
+    parser.add_option ( "-y", "--year", action="store", dest="year", \
+        type=int, help="Year of interest" )
+    parser.add_option('-o', '--output', action="store", dest="dir_out", default=".",\
+        type=str, help="Output directory" )
+    parser.add_option('-b', '--begin', action="store", dest="doy_start", default=1,\
+        type=int, help="Starting day of year (DoY)" )
+    parser.add_option('-e', '--end', action="store", dest="doy_end", type=int, default=-1, \
+        help="Ending day of year (DoY)" )
+    
+    (options, args) = parser.parse_args()
+    if not ( options.platform in [ "MOLA", "MOTA", "MOLT" ] ) :
+        log.fatal ("`platform` has to be one of MOLA, MOTA, MOLT")
+        sys.exit(-1)
+    
+    
+    get_modisfiles ( options.platform, options.product, options.year, options.tile, \
+            doy_start=options.doy_start, doy_end=options.doy_end, out_dir=options.dir_out, \
+            verbose=options.verbose )
