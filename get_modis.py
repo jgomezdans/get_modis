@@ -64,6 +64,11 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
     date of interest, and parsing the HTML (rudimentary parsing!) to search for
     the relevant filename for the tile the user is interested in. This file
     is then downloaded in the directory specified by `out_dir`.
+    
+    The function also checks to see if the selected remote file exists locally. If
+    it does, it checks that the remote and local file sizes are identical. If they
+    are, file isn't downloaded, but if they are different, the remote file is
+    downloaded.
 
     Parameters
     ----------
@@ -91,7 +96,7 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
     -------
     Nothing
     """
-    headers = { 'User-Agent' : 'get_modis Python 1.0.0' }
+    headers = { 'User-Agent' : 'get_modis Python 1.1.0' }
     if not os.path.exists ( out_dir ):
         if verbose:
             log.info("Creating outupt dir %s" % out_dir )
