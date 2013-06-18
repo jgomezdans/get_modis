@@ -3,7 +3,7 @@
 """
 SYNOPSIS
     
-./get_modis.py [-h,--help] [--verbose, -v] [--platform=PLATFORM, -s PLATFORM] \
+./get_modis.py [-h,--help] [--verbose, -v] [--platform=PLATFORM, -s PLATFORM] [--proxy=PROXY -p PROXY]\
     [--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE] [--year=YEAR, -y YEAR] \
     [--output=DIR_OUT, -o DIR_OUT] [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
 
@@ -54,7 +54,7 @@ log.addHandler(out_hdlr)
 log.setLevel(logging.INFO)
 
 
-def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  \
+def get_modisfiles ( platform, product, year, tile, proxy, doy_start=1, doy_end = -1,  \
     base_url="http://e4ftl01.cr.usgs.gov", out_dir=".", verbose=False ):
 
     """Download MODIS products for a given tile, year & period of interest
@@ -68,7 +68,7 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
     The function also checks to see if the selected remote file exists locally. If
     it does, it checks that the remote and local file sizes are identical. If they
     are, file isn't downloaded, but if they are different, the remote file is
-    downloaded.
+    downloaded. 
 
     Parameters
     ----------
@@ -81,6 +81,8 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
         The year of interest
     tile: str
         The tile (e.g., "h17v04")
+    proxy: dict
+        A proxy definition, such as {'http': 'http://127.0.0.1:8080', 'ftp': ''}, etc.
     doy_start: int
         The starting day of the year.
     doy_end: int 
@@ -96,7 +98,12 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
     -------
     Nothing
     """
-    headers = { 'User-Agent' : 'get_modis Python 1.1.0' }
+    
+    if proxy is not None:
+        proxy = urllib2.ProxyHandler( proxy )
+        opener = urllib2.build_opener( proxy )
+        urllib2.install_opener( opener )
+    headers = { 'User-Agent' : 'get_modis Python 1.2.0' }
     if not os.path.exists ( out_dir ):
         if verbose:
             log.info("Creating outupt dir %s" % out_dir )
@@ -165,13 +172,17 @@ if __name__ == "__main__":
         type=int, help="Starting day of year (DoY)" )
     parser.add_option('-e', '--end', action="store", dest="doy_end", type=int, default=-1, \
         help="Ending day of year (DoY)" )
-    
+    parser.add_option('-r', '--proxy', action="store", dest="proxy", type=str, default=None, \
+        help="HTTP proxy URL" )
     (options, args) = parser.parse_args()
     if not ( options.platform in [ "MOLA", "MOTA", "MOLT" ] ) :
         log.fatal ("`platform` has to be one of MOLA, MOTA, MOLT")
         sys.exit(-1)
+    if options.proxy is not None:
+        proxy = { 'http': options.proxy }
+        
     
     
-    get_modisfiles ( options.platform, options.product, options.year, options.tile, \
+    get_modisfiles ( options.platform, options.product, options.year, options.tile, proxy, \
             doy_start=options.doy_start, doy_end=options.doy_end, out_dir=options.dir_out, \
             verbose=options.verbose )
