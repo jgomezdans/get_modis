@@ -25,7 +25,7 @@ EXAMPLES
     The script will also work with monthly or 8-daily composites. Here's how you 
     download the monthly MCD45A1 (burned area) product for the same period:
     
-    $./get_modis.py -v -p MCD45A1.005 -s MOTA -y 2004 -t h17v04 -o /tmp/ -b 153 -e 243
+    $ ./get_modis.py -v -p MCD45A1.005 -s MOTA -y 2004 -t h17v04 -o /tmp/ -b 153 -e 243
         
 
 EXIT STATUS
@@ -112,13 +112,29 @@ def get_modisfiles ( platform, product, year, tile, doy_start=1, doy_end = -1,  
             for l in html:
                 if l.find( tile ) >=0  and l.find(".hdf") >= 0 and l.find(".hdf.xml") < 0:
                     fname = l.split("href=")[1].split(">")[0].strip('"')
-                    if verbose:
-                        log.info ( "Getting %s..... " % fname )
                     req = urllib2.Request ( "%s/%s/%s" % ( url, date, fname), None, headers)
-                    with open ( os.path.join( out_dir, fname ), 'wb' ) as fp:
-                        shutil.copyfileobj(urllib2.urlopen(req), fp)
-                    if verbose:
-                        log.info("Done!")
+                    download = False
+                    if not os.path.exists ( os.path.join( out_dir, fname ) ):
+                        # File not present, download
+                        download = True
+                    else:
+                        f = urllib2.urlopen(req)
+                        remote_file_size = int ( f.headers.dict['content-length'] )
+                        local_file_size = os.path.getsize(os.path.join( out_dir, fname ) )
+                        if remote_file_size != local_file_size:
+                            download = True
+                        
+                    if download:
+                        if verbose:
+                                log.info ( "Getting %s..... " % fname )
+                        with open ( os.path.join( out_dir, fname ), 'wb' ) as fp:
+                            shutil.copyfileobj(urllib2.urlopen(req), fp)
+                            if verbose:
+                                log.info("Done!")
+                    else:
+                        if verbose:
+                            log.info ("File %s already present. Skipping" % fname )
+
         except urllib2.URLError:
             log.info("Could not find data for %s(%s) for %s" % ( product, platform, date ))
     if verbose:
