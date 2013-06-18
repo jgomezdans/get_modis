@@ -107,7 +107,7 @@ def get_modisfiles ( platform, product, year, tile, proxy, doy_start=1, doy_end 
     if not os.path.exists ( out_dir ):
         if verbose:
             log.info("Creating outupt dir %s" % out_dir )
-        os.mkdirs ( out_dir )
+        os.makedirs ( out_dir )
     if doy_end == -1:
         if calendar.isleap ( year ):
             doy_end = 367
