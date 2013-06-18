@@ -53,7 +53,45 @@ out_hdlr.setLevel(logging.INFO)
 log.addHandler(out_hdlr)
 log.setLevel(logging.INFO)
 
+headers = { 'User-Agent' : 'get_modis Python 1.3.0' }
 
+def parse_modis_dates ( url, dates ):
+    """Parse returned MODIS dates.
+    
+    This function gets the dates listing for a given MODIS products, and extracts the 
+    dates for when data is available. Further, it crosses these dates with the required
+    dates that the user has selected and returns the intersection.
+    
+    Parameters
+    ----------
+    url: str
+        A URL such as "http://e4ftl01.cr.usgs.gov/MOTA/MCD45A1.005/"
+    dates: list
+        A list of dates in the required format "YYYY.MM.DD"
+        
+    Returns
+    -------
+    A (sorted) list with the dates that will be downloaded.
+    """
+
+    req = urllib2.Request ( "%s" % ( url ), None, headers)
+    html = urllib2.urlopen(req).readlines()
+            
+    available_dates = []
+    for l in html:
+        
+        if l.find ( "href" ) >= 0 and l.find ( "[DIR]" ) >= 0:
+            # Points to a directory
+            the_date = l.split('href="')[1].split('"')[0].strip("/")
+            available_dates.append ( the_date )
+    
+    dates = set ( dates )
+    available_dates = set ( available_dates )
+    suitable_dates = list( dates.intersection( available_dates ) )
+    suitable_dates.sort()
+    return suitable_dates
+    
+    
 def get_modisfiles ( platform, product, year, tile, proxy, doy_start=1, doy_end = -1,  \
     base_url="http://e4ftl01.cr.usgs.gov", out_dir=".", verbose=False ):
 
@@ -103,7 +141,7 @@ def get_modisfiles ( platform, product, year, tile, proxy, doy_start=1, doy_end 
         proxy = urllib2.ProxyHandler( proxy )
         opener = urllib2.build_opener( proxy )
         urllib2.install_opener( opener )
-    headers = { 'User-Agent' : 'get_modis Python 1.2.0' }
+    
     if not os.path.exists ( out_dir ):
         if verbose:
             log.info("Creating outupt dir %s" % out_dir )
@@ -117,6 +155,7 @@ def get_modisfiles ( platform, product, year, tile, proxy, doy_start=1, doy_end 
     dates = [time.strftime("%Y.%m.%d", time.strptime( "%d/%d" % ( i, year ), "%j/%Y")) \
             for i in xrange(doy_start, doy_end )]
     url = "%s/%s/%s/" % ( base_url, platform, product )
+    dates = parse_modis_dates ( url, dates )
     for date in dates:
         req = urllib2.Request ( "%s/%s" % ( url, date), None, headers)
         try:
@@ -180,6 +219,8 @@ if __name__ == "__main__":
         sys.exit(-1)
     if options.proxy is not None:
         proxy = { 'http': options.proxy }
+    else:
+        proxy = None
         
     
     
