@@ -165,6 +165,11 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
     url = "%s/%s/%s/" % ( base_url, platform, product )
     dates = parse_modis_dates ( url, dates )
     for date in dates:
+        the_day_today = time.asctime().split()[0]
+        the_hour_now = int( time.asctime().split()[3].split(":")[0] )
+        if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
+            time.sleep ( 60*60*( 18-the_hour_now) )
+            LOG.info ( "Sleeping for %d hours... Yawn!" % ( 18 - the_hour_now) )
         req = urllib2.Request ( "%s/%s" % ( url, date), None, HEADERS )
         try:
             html = urllib2.urlopen(req).readlines()
