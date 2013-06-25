@@ -50,6 +50,7 @@ import calendar
 import shutil
 import logging
 import sys
+import fnmatch
 
 LOG = logging.getLogger( __name__ )
 OUT_HDLR = logging.StreamHandler( sys.stdout )
@@ -60,13 +61,16 @@ LOG.setLevel( logging.INFO )
 
 HEADERS = { 'User-Agent' : 'get_modis Python 1.3.0' }
 
-def parse_modis_dates ( url, dates ):
+def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
     """Parse returned MODIS dates.
     
     This function gets the dates listing for a given MODIS products, and 
     extracts the dates for when data is available. Further, it crosses these 
     dates with the required dates that the user has selected and returns the 
-    intersection.
+    intersection. Additionally, if the `ruff` flag is set, we'll check for
+    files that might already be present in the system and skip them. Note
+    that if a file failed in downloading, it might still be around
+    incomplete.
     
     Parameters
     ----------
@@ -74,12 +78,22 @@ def parse_modis_dates ( url, dates ):
         A URL such as "http://e4ftl01.cr.usgs.gov/MOTA/MCD45A1.005/"
     dates: list
         A list of dates in the required format "YYYY.MM.DD"
-        
+    product: str
+        The product name, MOD09GA.005
+    out_dir: str
+        The output dir
+    ruff: bool
+        Whether to check for present files
     Returns
     -------
     A (sorted) list with the dates that will be downloaded.
     """
-
+    if ruff:
+        product = product.split(".")[0]
+        already_here = fnmatch.filter ( os.listdir ( out_dir ), "%s*hdf" % product )
+        already_here_dates = [ x.split(".")[-5][1:] \
+            for x in already_here ]
+                                      
     req = urllib2.Request ( "%s" % ( url ), None, HEADERS)
     html = urllib2.urlopen(req).readlines()
             
@@ -89,7 +103,21 @@ def parse_modis_dates ( url, dates ):
         if line.find ( "href" ) >= 0 and line.find ( "[DIR]" ) >= 0:
             # Points to a directory
             the_date = line.split('href="')[1].split('"')[0].strip("/")
-            available_dates.append ( the_date )
+            
+            if ruff:
+                try:
+                    modis_date = time.strftime( "%Y%j", time.strptime( \
+                        the_date, "%Y.%m.%d") )
+                except ValueError:
+                    continue
+                if modis_date in already_here_dates:
+                    continue
+                else:
+                    available_dates.append ( the_date )    
+            else:
+                available_dates.append ( the_date )    
+                
+            
     
     dates = set ( dates )
     available_dates = set ( available_dates )
@@ -100,7 +128,7 @@ def parse_modis_dates ( url, dates ):
     
 def get_modisfiles ( platform, product, year, tile, proxy, \
     doy_start=1, doy_end = -1,  \
-    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".", verbose=False ):
+    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".", ruff=False, verbose=False ):
 
     """Download MODIS products for a given tile, year & period of interest
 
@@ -137,6 +165,9 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
         The URL to use. Shouldn't be changed, unless USGS change the server.
     out_dir: str 
         The output directory. Will be create if it doesn't exist
+    ruff: Boolean
+        Check to see what files are already available and download them without
+        testing for file size etc.
     verbose: Boolean
         Whether to sprout lots of text out or not.
 
@@ -163,7 +194,7 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
     dates = [time.strftime("%Y.%m.%d", time.strptime( "%d/%d" % ( i, year ), \
             "%j/%Y"))  for i in xrange(doy_start, doy_end )]
     url = "%s/%s/%s/" % ( base_url, platform, product )
-    dates = parse_modis_dates ( url, dates )
+    dates = parse_modis_dates ( url, dates, product, out_dir, ruff=ruff )
     for date in dates:
         the_day_today = time.asctime().split()[0]
         the_hour_now = int( time.asctime().split()[3].split(":")[0] )
@@ -235,6 +266,8 @@ if __name__ == "__main__":
         type=int, default=-1, help="Ending day of year (DoY)" )
     parser.add_option('-r', '--proxy', action="store", dest="proxy", \
         type=str, default=None, help="HTTP proxy URL" )
+    parser.add_option('-q', '--quick', action="store_true", dest="quick", \
+        default=False, help="Quick check to see whether files are present" )
     (options, args) = parser.parse_args()
     if not ( options.platform in [ "MOLA", "MOTA", "MOLT" ] ) :
         LOG.fatal ("`platform` has to be one of MOLA, MOTA, MOLT")
@@ -250,4 +283,4 @@ if __name__ == "__main__":
             options.tile, PROXY, \
             doy_start=options.doy_start, doy_end=options.doy_end, \
             out_dir=options.dir_out, \
-            verbose=options.verbose )
+            verbose=options.verbose, ruff=options.quick )
