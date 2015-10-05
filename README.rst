@@ -8,7 +8,7 @@ get_modis
 Description
 --------------
 
-This repository contains a Python script (and executable) that allows one to download MODIS data granules for different products and periods. 
+This repository contains a Python 3.4 script (and executable) that allows one to download MODIS data granules for different products, periods and non-reprojected images (with lat/lon coordinates). 
 
 The code is quite simple and generic, and should work with most standard Python installations.
 
@@ -38,6 +38,8 @@ issuing the ``-h`` or ``--help`` commands:
     collection number), the year, the MODIS reference tile and additionally, where
     to save the data to, and whether to verbose. The user may also select a 
     temporal period in terms of days of year.
+    New: Now this program is compatible with Python 3.4 and it can download non-reprojected
+    MODIS images with lat/lon coordinates (now it parses the hdf associated xml for the bounding box). 
 
     EXAMPLES
 
