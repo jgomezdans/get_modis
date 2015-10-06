@@ -51,6 +51,7 @@ import shutil
 import logging
 import sys
 import fnmatch
+from lxml import etree
 
 LOG = logging.getLogger(__name__)
 OUT_HDLR = logging.StreamHandler(sys.stdout)
@@ -62,7 +63,7 @@ LOG.setLevel(logging.INFO)
 HEADERS = {'User-Agent': 'get_modis Python 3.5.0'}
 
 
-def parse_modis_dates(url, dates, product, out_dir, ruff=False):
+def parse_modis_dates(url, dates, product, out_dir, verbose, ruff=False):
     """Parse returned MODIS dates.
     
     This function gets the dates listing for a given MODIS products, and 
@@ -100,7 +101,6 @@ def parse_modis_dates(url, dates, product, out_dir, ruff=False):
 
     available_dates = []
     for line in lines:
-        print("Linea: " + line)
         if line.find("href") >= 0 and line.find("[DIR]") >= 0:
             # Points to a directory
             the_date = line.split('href="')[1].split('"')[0].strip("/")
@@ -121,13 +121,26 @@ def parse_modis_dates(url, dates, product, out_dir, ruff=False):
     available_dates = set(available_dates)
     suitable_dates = list(dates.intersection(available_dates))
     suitable_dates.sort()
-    print(suitable_dates)
+    if verbose:
+        LOG.info(suitable_dates)
     return suitable_dates
 
 
-def parse_modis_boundingbox(url_xml, upper_left, down_right):
+def parse_modis_coordinates(url_xml, upper_left, down_right, verbose):
     req = urllib2.Request("%s" % url_xml, None, HEADERS)
+    print(url_xml)
+    root = etree.parse(urllib2.urlopen(req))
+    bbox = []
+    for point in root.xpath('/GranuleMetaDataFile/GranuleURMetaData/SpatialDomainContainer/'
+                            'HorizontalSpatialDomainContainer/GPolygon/Boundary/Point'):
+        lon = point.xpath('./PointLongitude')
+        lat = point.xpath('./PointLatitude')
+        bbox.append((lat[0].text, lon[0].text))
 
+    if verbose:
+        for point in bbox:
+            (lat, lon) = point
+            LOG.info("Point: LAT -> %s LON -> %s" % (lat, lon))
     return True
 
 
@@ -198,7 +211,7 @@ def get_modisfiles(platform, product, year, tile, proxy,
     dates = [time.strftime("%Y.%m.%d", time.strptime("%d/%d" % (i, year),
                                                      "%j/%Y")) for i in range(doy_start, doy_end)]
     url = "%s/%s/%s/" % (base_url, platform, product)
-    dates = parse_modis_dates(url, dates, product, out_dir, ruff=ruff)
+    dates = parse_modis_dates(url, dates, product, out_dir, verbose, ruff=ruff)
     for date in dates:
         the_day_today = time.asctime().split()[0]
         the_hour_now = int(time.asctime().split()[3].split(":")[0])
@@ -208,9 +221,19 @@ def get_modisfiles(platform, product, year, tile, proxy,
         req = urllib2.Request("%s/%s" % (url, date), None, HEADERS)
         try:
             html = str(urllib2.urlopen(req).readlines()).split('</a>')
+
             for line in html:
-                if line.find(tile) >= 0 and line.find(".hdf") >= 0 and line.find(".hdf.xml") < 0:
+                compatible = False
+                if tile is None and line.find(".hdf") >= 0 and line.find(".hdf.xml") < 0:
                     fname = line.split("href=")[1].split(">")[0].strip('"')
+                    compatible = parse_modis_coordinates("%s%s/%s.xml" % (url, date, fname), 1, 1, verbose)
+                else:
+                    if tile is not None and line.find(tile) >= 0 and line.find(".hdf") >= 0 and line.find(
+                            ".hdf.xml") < 0:
+                        fname = line.split("href=")[1].split(">")[0].strip('"')
+                        compatible = True
+
+                if compatible:
                     req = urllib2.Request("%s/%s/%s" % (url, date, fname), None, HEADERS)
                     download = False
                     if not os.path.exists(os.path.join(out_dir, fname)):
@@ -224,7 +247,6 @@ def get_modisfiles(platform, product, year, tile, proxy,
                             out_dir, fname))
                         if remote_file_size != local_file_size:
                             download = True
-
                     if download:
                         if verbose:
                             LOG.info("Getting %s..... " % fname)
@@ -254,8 +276,11 @@ if __name__ == "__main__":
                       type=str, help="MODIS product name with collection tag at the end " +
                                      "(e.g. MOD09GA.005)")
     parser.add_option('-t', '--tile', action="store", dest="tile",
-                      type=str, help="Required tile (h17v04, for example)")
-    parser.add_option("-y", "--year", action="store", dest="year",
+                      type=str, default=None, help="Required tile (h17v04, for example)")
+    parser.add_option('-c', '--cordinates', action="store", dest="upperleft",
+                      type=str, default=None, help="Coordinates of non-reprojected tile upperleft "
+                                                   "and downright point (lat,lon,lat,lon)")
+    parser.add_option('-y', '--year', action="store", dest="year",
                       type=int, help="Year of interest")
     parser.add_option('-o', '--output', action="store", dest="dir_out",
                       default=".", type=str, help="Output directory")
