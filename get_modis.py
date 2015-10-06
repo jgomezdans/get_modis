@@ -52,6 +52,7 @@ import logging
 import sys
 import fnmatch
 from lxml import etree
+from shapely.geometry import Polygon, MultiPoint
 
 LOG = logging.getLogger(__name__)
 OUT_HDLR = logging.StreamHandler(sys.stdout)
@@ -126,7 +127,15 @@ def parse_modis_dates(url, dates, product, out_dir, verbose, ruff=False):
     return suitable_dates
 
 
-def parse_modis_coordinates(url_xml, upper_left, down_right, verbose):
+def parse_modis_coordinates(url_xml, coordinates, verbose):
+    upperleft = (float(coordinates.split(',')[0]), float(coordinates.split(',')[1]))  # lat, lon
+    downright = (float(coordinates.split(',')[2]), float(coordinates.split(',')[3]))  # lat, lon
+    upperright = (upperleft[0], downright[1])
+    downleft = (downright[0], upperleft[1])
+    requested_bbox = Polygon((upperleft, upperright, downright, downleft))
+    if verbose:
+        LOG.info("UL: LAT -> %s, LON -> %s" % upperleft)
+        LOG.info("DR: LAT -> %s, LON -> %s" % downright)
     req = urllib2.Request("%s" % url_xml, None, HEADERS)
     print(url_xml)
     root = etree.parse(urllib2.urlopen(req))
@@ -135,16 +144,22 @@ def parse_modis_coordinates(url_xml, upper_left, down_right, verbose):
                             'HorizontalSpatialDomainContainer/GPolygon/Boundary/Point'):
         lon = point.xpath('./PointLongitude')
         lat = point.xpath('./PointLatitude')
-        bbox.append((lat[0].text, lon[0].text))
-
+        bbox.append((float(lat[0].text), float(lon[0].text)))
+    product_bbox = MultiPoint(bbox).convex_hull
     if verbose:
         for point in bbox:
             (lat, lon) = point
             LOG.info("Point: LAT -> %s LON -> %s" % (lat, lon))
-    return True
+
+    if requested_bbox.intersects(product_bbox):
+        LOG.info("Compatible")
+        return True
+    else:
+        LOG.info("Not Compatible")
+        return False
 
 
-def get_modisfiles(platform, product, year, tile, proxy,
+def get_modisfiles(platform, product, year, tile, coordinates, proxy,
                    doy_start=1, doy_end=-1,
                    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".", ruff=False, verbose=False):
     """Download MODIS products for a given tile, year & period of interest
@@ -171,6 +186,8 @@ def get_modisfiles(platform, product, year, tile, proxy,
         The year of interest
     tile: str
         The tile (e.g., "h17v04")
+    coordinates: str
+        The coordinates of the upperleft and downright point of the requested bbox in the form 'lat,lon,lat,lon'
     proxy: dict
         A proxy definition, such as {'http': 'http://127.0.0.1:8080',
         'ftp': ''}, etc.
@@ -226,7 +243,7 @@ def get_modisfiles(platform, product, year, tile, proxy,
                 compatible = False
                 if tile is None and line.find(".hdf") >= 0 and line.find(".hdf.xml") < 0:
                     fname = line.split("href=")[1].split(">")[0].strip('"')
-                    compatible = parse_modis_coordinates("%s%s/%s.xml" % (url, date, fname), 1, 1, verbose)
+                    compatible = parse_modis_coordinates("%s%s/%s.xml" % (url, date, fname), coordinates, verbose)
                 else:
                     if tile is not None and line.find(tile) >= 0 and line.find(".hdf") >= 0 and line.find(
                             ".hdf.xml") < 0:
@@ -242,7 +259,7 @@ def get_modisfiles(platform, product, year, tile, proxy,
                     else:
                         the_remote_file = urllib2.urlopen(req)
                         remote_file_size = int(
-                            the_remote_file.headers.dict['content-length'])
+                            the_remote_file.headers['content-length'])
                         local_file_size = os.path.getsize(os.path.join(
                             out_dir, fname))
                         if remote_file_size != local_file_size:
@@ -277,7 +294,7 @@ if __name__ == "__main__":
                                      "(e.g. MOD09GA.005)")
     parser.add_option('-t', '--tile', action="store", dest="tile",
                       type=str, default=None, help="Required tile (h17v04, for example)")
-    parser.add_option('-c', '--cordinates', action="store", dest="upperleft",
+    parser.add_option('-c', '--cordinates', action="store", dest="coordinates",
                       type=str, default=None, help="Coordinates of non-reprojected tile upperleft "
                                                    "and downright point (lat,lon,lat,lon)")
     parser.add_option('-y', '--year', action="store", dest="year",
@@ -300,9 +317,18 @@ if __name__ == "__main__":
         PROXY = {'http': options.proxy}
     else:
         PROXY = None
+    if options.coordinates is None and options.tile is None:
+        LOG.fatal("You must insert coordinates or tile")
+        sys.exit(-1)
+    if options.coordinates is not None:
+        upperleft = (float(options.coordinates.split(',')[0]), float(options.coordinates.split(',')[1]))  # lat, lon
+        downright = (float(options.coordinates.split(',')[2]), float(options.coordinates.split(',')[3]))  # lat, lon
+        if downright[1] <= upperleft[1] or upperleft[0] <= downright[0]:
+            LOG.fatal("It seems that the coordinates are inverted.")
+            sys.exit(-1)
 
     get_modisfiles(options.platform, options.product, options.year,
-                   options.tile, PROXY,
+                   options.tile, options.coordinates, PROXY,
                    doy_start=options.doy_start, doy_end=options.doy_end,
                    out_dir=options.dir_out,
                    verbose=options.verbose, ruff=options.quick)
