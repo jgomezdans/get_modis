@@ -8,7 +8,7 @@ get_modis
 Description
 --------------
 
-This repository contains a Python script (and executable) that allows one to download MODIS data granules for different products and periods. 
+This repository contains a Python 3.5 script (and executable) that allows one to download MODIS data granules for different products, periods and non-reprojected images (with lat/lon coordinates).
 
 The code is quite simple and generic, and should work with most standard Python installations.
 
@@ -38,6 +38,8 @@ issuing the ``-h`` or ``--help`` commands:
     collection number), the year, the MODIS reference tile and additionally, where
     to save the data to, and whether to verbose. The user may also select a 
     temporal period in terms of days of year.
+    New: Now this program is compatible with Python 3.5 and it can download non-reprojected
+    MODIS images with lat/lon coordinates (now it parses the hdf associated xml for the bounding box). 
 
     EXAMPLES
 
@@ -72,6 +74,7 @@ issuing the ``-h`` or ``--help`` commands:
                             MODIS product name with collection tag at the end
                             (e.g. MOD09GA.005)
     --tile=TILE, -t TILE    Required tile (h17v04, for example)
+    --coordinates=COORDINATES, -c COORDINATES   Required bounding box in the form: lat,lon,lat,lon (upperleft, downright point)
     --year=YEAR, -y YEAR    Year of interest
     --output=DIR_OUT, -o DIR_OUT
                             Output directory
@@ -89,5 +92,6 @@ Useful things to bear in mind:
 * The product must have an indication of the collection follwing the product name. i.e. ``MCD45A1.005``)
 * The ``--begin`` and ``--end`` flags are optional, and yu can ignore them if you just want the complete year
 * Use the ``--proxy`` option to set the required proxy. It should be read from the environment variable, but this is added flexiblity
+* Use ``-t`` for TILE **OR** ``-c`` for COORDINATES NOT AT THE SAME TIME, otherwise it downloads only by coordinates
 
 The code has some logic not to download files several times, and the overall behaviour rests on the ``--quick`` flag: if this flag is **not** set, then the program will look at the remote available files and skip any files that are present and have the same file size as the remote. In some cases, this could lead to duplicities are re-processing takes place. If the ``--quick`` flag is set, then when the remote list of available dates is created, any present files that match the requested product and year will be ignored, irrespective of file size. This can mean that files that failed to download half way through will not the downloaded, but it's an overall faster process if a download failed halfway through a year.
