@@ -44,7 +44,10 @@ AUTHOR
 """
 import optparse
 import os
-import urllib2
+try:
+    import urllib.request as urllib2
+except ImportError:
+    import urllib2
 import time
 import calendar
 import shutil
@@ -100,9 +103,9 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
     available_dates = []
     for line in html:
         
-        if line.find ( "href" ) >= 0 and line.find ( "[DIR]" ) >= 0:
+        if line.decode().find ( "href" ) >= 0 and line.decode().find ( "[DIR]" ) >= 0:
             # Points to a directory
-            the_date = line.split('href="')[1].split('"')[0].strip("/")
+            the_date = line.decode().split('href="')[1].split('"')[0].strip("/")
             
             if ruff:
                 try:
@@ -192,7 +195,7 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
             doy_end = 366
     
     dates = [time.strftime("%Y.%m.%d", time.strptime( "%d/%d" % ( i, year ), \
-            "%j/%Y"))  for i in xrange(doy_start, doy_end )]
+            "%j/%Y"))  for i in range(doy_start, doy_end )]
     url = "%s/%s/%s/" % ( base_url, platform, product )
     dates = parse_modis_dates ( url, dates, product, out_dir, ruff=ruff )
     for date in dates:
@@ -205,9 +208,9 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
         try:
             html = urllib2.urlopen(req).readlines()
             for line in html:
-                if line.find( tile ) >=0  and line.find(".hdf") >= 0 and \
-                    line.find(".hdf.xml") < 0:
-                    fname = line.split("href=")[1].split(">")[0].strip('"')
+                if line.decode().find( tile ) >=0  and line.decode().find(".hdf") >= 0 and \
+                    line.decode().find(".hdf.xml") < 0:
+                    fname = line.decode().split("href=")[1].split(">")[0].strip('"')
                     req = urllib2.Request ( "%s/%s/%s" % ( url, date, fname), \
                         None, HEADERS )
                     download = False
