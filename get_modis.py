@@ -54,6 +54,7 @@ import shutil
 import logging
 import sys
 import fnmatch
+from socket import timeout
 
 LOG = logging.getLogger( __name__ )
 OUT_HDLR = logging.StreamHandler( sys.stdout )
@@ -179,6 +180,8 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
     Nothing
     """
     
+    failures = []
+
     if proxy is not None:
         proxy = urllib2.ProxyHandler( proxy )
         opener = urllib2.build_opener( proxy )
@@ -201,9 +204,9 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
     for date in dates:
         the_day_today = time.asctime().split()[0]
         the_hour_now = int( time.asctime().split()[3].split(":")[0] )
-        if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
-            time.sleep ( 60*60*( 18-the_hour_now) )
-            LOG.info ( "Sleeping for %d hours... Yawn!" % ( 18 - the_hour_now) )
+        #if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
+        #    time.sleep ( 60*60*( 18-the_hour_now) )
+        #    LOG.info ( "Sleeping for %d hours... Yawn!" % ( 18 - the_hour_now) )
         req = urllib2.Request ( "%s/%s" % ( url, date), None, HEADERS )
         try:
             html = urllib2.urlopen(req).readlines()
@@ -219,6 +222,7 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
                         download = True
                     else:
                         the_remote_file = urllib2.urlopen(req)
+                        print(the_remote_file)
                         remote_file_size = int ( \
                             the_remote_file.headers.dict['content-length'] )
                         local_file_size = os.path.getsize(os.path.join( \
@@ -231,8 +235,14 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
                             LOG.info ( "Getting %s..... " % fname )
                         with open ( os.path.join( out_dir, fname ), 'wb' ) \
                                 as local_file_fp:
-                            shutil.copyfileobj(urllib2.urlopen(req), \
-                                local_file_fp)
+                            try:
+                                shutil.copyfileobj(urllib2.urlopen(req), \
+                                    local_file_fp)
+                            except(HTTPError, URLError) as error:
+                                if isinstance(e.reason, socket.timeout):
+                                    LOG.error('Data of %s not retrieved because %s\nURL: %s', name, error, url)
+                            except timeout:
+                                LOG.error('Socket timed out - URL %s', url)
                             if verbose:
                                 LOG.info("Done!")
                     else:
