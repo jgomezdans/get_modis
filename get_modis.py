@@ -65,8 +65,25 @@ LOG.setLevel( logging.INFO )
 
 HEADERS = { 'User-Agent' : 'get_modis Python 1.3.0' }
 
+<<<<<<< HEAD
 urllib_major_version = int(urllib2.__version__.split('.')[0])
 
+=======
+def return_url ( url ):
+
+    the_day_today = time.asctime().split()[0]
+    the_hour_now = int( time.asctime().split()[3].split(":")[0] )
+    if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
+        LOG.info ( "Sleeping for %d hours... Yawn!" % ( 18 - the_hour_now) )
+        time.sleep ( 60*60*( 18-the_hour_now) )
+        #LOG.info ( "Sleeping for %d hours... Yawn!" % ( 18 - the_hour_now) )
+    
+    req = urllib2.Request ( "%s" % ( url ), None, HEADERS)
+    html = urllib2.urlopen(req).readlines()
+    return html
+                
+    
+>>>>>>> c3d9c9549c41d138c9176fa437a4fc3aca9139db
 def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
     """Parse returned MODIS dates.
     
@@ -100,8 +117,9 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
         already_here_dates = [ x.split(".")[-5][1:] \
             for x in already_here ]
                                       
-    req = urllib2.Request ( "%s" % ( url ), None, HEADERS)
-    html = urllib2.urlopen(req).readlines()
+    #req = urllib2.Request ( "%s" % ( url ), None, HEADERS)
+    #html = urllib2.urlopen(req).readlines()
+    html = return_url ( url )
             
     available_dates = []
     for line in html:
@@ -204,14 +222,19 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
     url = "%s/%s/%s/" % ( base_url, platform, product )
     dates = parse_modis_dates ( url, dates, product, out_dir, ruff=ruff )
     for date in dates:
+<<<<<<< HEAD
         the_day_today = time.asctime().split()[0]
         the_hour_now = int( time.asctime().split()[3].split(":")[0] )
         #if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
         #    time.sleep ( 60*60*( 18-the_hour_now) )
         #    LOG.info ( "Sleeping for %d hours... Yawn!" % ( 18 - the_hour_now) )
         req = urllib2.Request ( "%s/%s" % ( url, date), None, HEADERS )
+=======
+        #req = urllib2.Request ( "%s/%s" % ( url, date), None, HEADERS )
+>>>>>>> c3d9c9549c41d138c9176fa437a4fc3aca9139db
         try:
-            html = urllib2.urlopen(req).readlines()
+            html = return_url ( "%s/%s" % ( url, date ) )
+            #html = urllib2.urlopen(req).readlines()
             for line in html:
                 if line.decode().find( tile ) >=0  and line.decode().find(".hdf") >= 0 and \
                     line.decode().find(".hdf.xml") < 0:
