@@ -65,6 +65,8 @@ LOG.setLevel( logging.INFO )
 
 HEADERS = { 'User-Agent' : 'get_modis Python 1.3.0' }
 
+urllib_major_version = int(urllib2.__version__.split('.')[0])
+
 def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
     """Parse returned MODIS dates.
     
@@ -222,9 +224,16 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
                         download = True
                     else:
                         the_remote_file = urllib2.urlopen(req)
-                        print(the_remote_file)
-                        remote_file_size = int ( \
-                            the_remote_file.headers.dict['content-length'] )
+                        # Check urllib version to determine how to handle headers
+                        if urllib_major_version == 3:
+                            remote_file_info = the_remote_file.info()
+                            remote_file_size = int(remote_file_info['content-length'])
+                        elif urllib_major_version == 2:
+                            remote_file_size = int ( \
+                                the_remote_file.headers.dict['content-length'] )
+                        else:
+                            LOG.error('Could not check remote file size, unknown urllib version')
+                            raise
                         local_file_size = os.path.getsize(os.path.join( \
                             out_dir, fname ) )
                         if remote_file_size != local_file_size:
