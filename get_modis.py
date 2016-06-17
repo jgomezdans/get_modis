@@ -256,8 +256,12 @@ def get_modisfiles ( platform, product, year, tile, proxy, \
                         with open ( os.path.join( out_dir, fname ), 'wb' ) \
                                 as local_file_fp:
                             try:
-                                shutil.copyfileobj(urllib2.urlopen(req), \
-                                    local_file_fp)
+                                if urllib_major_version >= 3:
+                                    shutil.copyfileobj(urllib2.urlopen(req, timeout=20), \
+                                        local_file_fp)
+                                else:
+                                    shutil.copyfileobj(urllib2.urlopen(req), \
+                                        local_file_fp)
                             except(HTTPError, URLError) as error:
                                 if isinstance(e.reason, socket.timeout):
                                     LOG.error('Data of %s not retrieved because %s\nURL: %s', name, error, url)
