@@ -32,7 +32,7 @@ import requests
 
 __author__ = "J Gomez-Dans"
 __copyright__ = "Copyright 2013-2016 J Gomez-Dans"
-__version__ = "1.1"
+__version__ = "1.3.1"
 __license__ = "GPLv3"
 __email__ = "j.gomez-dans@ucl.ac.uk"
 
