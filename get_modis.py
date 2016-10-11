@@ -259,6 +259,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
 
     with requests.Session() as s:
         s.auth = (username, password)
+        s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
         for the_url in them_urls:
             r1 = s.request('get', the_url)
             r = s.get(r1.url, stream=True, timeout=(5,10))
