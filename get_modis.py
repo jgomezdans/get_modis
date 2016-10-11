@@ -320,7 +320,8 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         s.auth = (username, password)
         for the_url in them_urls:
             r1 = s.request('get', the_url)
-            r = s.get(r1.url, stream=True)
+            # Set connect and read timeouts (seconds)
+            r = s.get(r1.url, stream=True, timeout=(5, 10))
             if not r.ok:
                 raise IOError("Can't start download... [%s]" % fname)
             file_size = int(r.headers['content-length'])
