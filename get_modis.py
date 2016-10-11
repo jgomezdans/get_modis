@@ -78,19 +78,6 @@ AUTHOR
     See also http://github.com/jgomezdans/get_modis/
 
 """
-import optparse
-import os
-try:
-    import urllib.request as urllib2
-except ImportError:
-    import urllib2
-import time
-import calendar
-import shutil
-import logging
-import sys
-import fnmatch
-from socket import timeout
 
 LOG = logging.getLogger( __name__ )
 OUT_HDLR = logging.StreamHandler( sys.stdout )
@@ -102,8 +89,6 @@ LOG.setLevel( logging.INFO )
 HEADERS = { 'User-Agent' : 'get_modis Python %s' % __version__ }
 
 CHUNKS = 65536
-
-urllib_major_version = int(urllib2.__version__.split('.')[0])
 
 
 def return_url(url):
@@ -236,8 +221,6 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     -------
     Nothing
     """
-    
-    failures = []
 
     if proxy is not None:
         proxy = urllib2.ProxyHandler(proxy)
@@ -267,48 +250,6 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                 if line.decode().find(
                         ".hdf") >= 0 > line.decode().find(".hdf.xml"):
                     fname = line.decode().split("href=")[1].split(">")[0].strip('"')
-                    req = urllib2.Request ( "%s/%s/%s" % ( url, date, fname), \
-                        None, HEADERS )
-                    download = False
-                    if not os.path.exists ( os.path.join( out_dir, fname ) ):
-                        # File not present, download
-                        download = True
-                    else:
-                        the_remote_file = urllib2.urlopen(req)
-                        # Check urllib version to determine how to handle headers
-                        if urllib_major_version == 3:
-                            remote_file_info = the_remote_file.info()
-                            remote_file_size = int(remote_file_info['content-length'])
-                        elif urllib_major_version == 2:
-                            remote_file_size = int ( \
-                                the_remote_file.headers.dict['content-length'] )
-                        else:
-                            LOG.error('Could not check remote file size, unknown urllib version')
-                            raise
-                        local_file_size = os.path.getsize(os.path.join( \
-                            out_dir, fname ) )
-                        if remote_file_size != local_file_size:
-                            download = True
-                        
-                    if download:
-                        if verbose:
-                            LOG.info ( "Getting %s..... " % fname )
-                        with open ( os.path.join( out_dir, fname ), 'wb' ) \
-                                as local_file_fp:
-                            try:
-                                if urllib_major_version >= 3:
-                                    shutil.copyfileobj(urllib2.urlopen(req, timeout=20), \
-                                        local_file_fp)
-                                else:
-                                    shutil.copyfileobj(urllib2.urlopen(req), \
-                                        local_file_fp)
-                            except(HTTPError, URLError) as error:
-                                if isinstance(e.reason, socket.timeout):
-                                    LOG.error('Data of %s not retrieved because %s\nURL: %s', name, error, url)
-                            except timeout:
-                                LOG.error('Socket timed out - URL %s', url)
-                            if verbose:
-                                LOG.info("Done!")
 
                     if not os.path.exists(os.path.join(out_dir, fname)):
                         them_urls.append("%s/%s/%s" % (url, date, fname))
@@ -320,8 +261,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         s.auth = (username, password)
         for the_url in them_urls:
             r1 = s.request('get', the_url)
-            # Set connect and read timeouts (seconds)
-            r = s.get(r1.url, stream=True, timeout=(5, 10))
+            r = s.get(r1.url, stream=True, timeout=(5,10))
             if not r.ok:
                 raise IOError("Can't start download... [%s]" % fname)
             file_size = int(r.headers['content-length'])
