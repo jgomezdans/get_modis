@@ -246,10 +246,9 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     for date in dates:
         r = requests.get("%s/%s" % (url, date), verify=False)
         for line in r.text.split("\n"):
-            if line.decode().find(tile) >= 0:
-                if line.decode().find(
-                        ".hdf") >= 0 > line.decode().find(".hdf.xml"):
-                    fname = line.decode().split("href=")[1].split(">")[0].strip('"')
+            if line.find(tile) >= 0:
+                if line.find(".hdf") >= 0 > line.find(".hdf.xml"):
+                    fname = line.split("href=")[1].split(">")[0].strip('"')
 
                     if not os.path.exists(os.path.join(out_dir, fname)):
                         them_urls.append("%s/%s/%s" % (url, date, fname))
@@ -259,9 +258,10 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
 
     with requests.Session() as s:
         s.auth = (username, password)
+        s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
         for the_url in them_urls:
             r1 = s.request('get', the_url)
-            r = s.get(r1.url, stream=True)
+            r = s.get(r1.url, stream=True, timeout=(5,10))
             if not r.ok:
                 raise IOError("Can't start download... [%s]" % fname)
             file_size = int(r.headers['content-length'])
