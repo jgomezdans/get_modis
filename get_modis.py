@@ -246,10 +246,9 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     for date in dates:
         r = requests.get("%s/%s" % (url, date), verify=False)
         for line in r.text.split("\n"):
-            if line.decode().find(tile) >= 0:
-                if line.decode().find(
-                        ".hdf") >= 0 > line.decode().find(".hdf.xml"):
-                    fname = line.decode().split("href=")[1].split(">")[0].strip('"')
+            if line.find(tile) >= 0:
+                if line.find(".hdf") >= 0 > line.find(".hdf.xml"):
+                    fname = line.split("href=")[1].split(">")[0].strip('"')
 
                     if not os.path.exists(os.path.join(out_dir, fname)):
                         them_urls.append("%s/%s/%s" % (url, date, fname))
