@@ -170,7 +170,8 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
 def get_modisfiles(username, password, platform, product, year, tile, proxy,
                    doy_start=1, doy_end=-1,
                    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".",
-                   ruff=False, verbose=False):
+                   ruff=False, verbose=False,
+                   reconnection_attempts=5):
 
     """Download MODIS products for a given tile, year & period of interest
 
@@ -216,6 +217,8 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         testing for file size etc.
     verbose: Boolean
         Whether to sprout lots of text out or not.
+    reconnection_attempts: int, default 5
+        Number of times to attempt to open HTTP Connection before giving up.
 
     Returns
     -------
@@ -256,28 +259,52 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                         if verbose:
                             LOG.info("File %s already present. Skipping" % fname)
 
-    with requests.Session() as s:
-        s.auth = (username, password)
-        s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
-        for the_url in them_urls:
-            r1 = s.request('get', the_url)
-            r = s.get(r1.url, stream=True, timeout=(5,10))
-            if not r.ok:
-                raise IOError("Can't start download... [%s]" % fname)
-            file_size = int(r.headers['content-length'])
-            fname = the_url.split("/")[-1]
-            LOG.info("Starting download on %s(%d bytes) ..." %
-                     (os.path.join(out_dir, fname), file_size))
-            with open(os.path.join(out_dir, fname), 'wb') as fp:
-                for chunk in r.iter_content(chunk_size=CHUNKS):
-                    if chunk:
-                        fp.write(chunk)
-                fp.flush()
-                os.fsync(fp)
-                if verbose:
-                    LOG.info("\tDone!")
-    if verbose:
-        LOG.info("Completely finished downlading all there was")
+    count_reconn_attempts = 0
+    while count_reconn_attempts <= reconnection_attempts:
+        try:
+            with requests.Session() as s:
+                s.auth = (username, password)
+                s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
+                print(len(them_urls))
+                while len(them_urls) > 0:
+                    the_url = them_urls.pop(0)
+                    r1 = s.request('get', the_url)
+                    r = s.get(r1.url, stream=True, timeout=(5,10))
+                    if not r.ok:
+                        raise IOError("Can't start download... [%s]" % fname)
+                    file_size = int(r.headers['content-length'])
+                    fname = the_url.split("/")[-1]
+                    LOG.info("Starting download on %s(%d bytes) ..." %
+                             (os.path.join(out_dir, fname), file_size))
+                    with open(os.path.join(out_dir, fname), 'wb') as fp:
+                        for chunk in r.iter_content(chunk_size=CHUNKS):
+                            if chunk:
+                                fp.write(chunk)
+                        fp.flush()
+                        os.fsync(fp)
+                        if verbose:
+                            LOG.info("\tDone!")
+            if verbose:
+                LOG.info("Completely finished downloading all there was")
+
+        except requests.exceptions.ConnectionError:
+
+            # Increment number of reconnection attempts
+            count_reconn_attempts += 1
+
+            # Put the most recent (failed) file back into the list
+            them_urls.insert(0, the_url)
+
+            # Begin the re-connection process (unless max attempts reached)    
+            continue
+
+        # If we get here then the download session has been successful
+        break
+
+    # Raise error if download session failed
+    if count_reconn_attempts == reconnection_attempts:
+        print('Maximum number of Session reconnection attempts reached.')
+        raise requests.exceptions.ConnectionError
 
 
 if __name__ == "__main__":
