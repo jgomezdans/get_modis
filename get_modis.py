@@ -103,7 +103,7 @@ def return_url(url):
     return html
 
 
-def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
+def parse_modis_dates ( url, dates, product, out_dir, check_sizes=False ):
     """Parse returned MODIS dates.
 
     This function gets the dates listing for a given MODIS products, and
@@ -124,13 +124,18 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
         The product name, MOD09GA.005
     out_dir: str
         The output dir
-    ruff: bool
-        Whether to check for present files
+    check_sizes: bool
+        Default False. If true then this function will not bother to check 
+        for existing local files as the user wants the script to do fine
+        checking by comparing local and remote file sizes instead of just
+        relying on .part suffixes for incomplete files.
+
     Returns
     -------
     A (sorted) list with the dates that will be downloaded.
     """
-    if ruff:
+
+    if not check_sizes:
         product = product.split(".")[0]
         already_here = fnmatch.filter(os.listdir(out_dir),
                                       "%s*hdf" % product)
@@ -146,7 +151,8 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
                         line.decode().find("[DIR]") >= 0:
             # Points to a directory
             the_date = line.decode().split('href="')[1].split('"')[0].strip("/")
-            if ruff:
+            
+            if not check_sizes:
                 try:
                     modis_date = time.strftime("%Y%j",
                                                time.strptime(the_date,
@@ -157,9 +163,10 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
                     continue
                 else:
                     available_dates.append(the_date)
+
             else:
                 available_dates.append(the_date)
-
+            
     dates = set(dates)
     available_dates = set(available_dates)
     suitable_dates = list(dates.intersection(available_dates))
@@ -170,8 +177,9 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
 def get_modisfiles(username, password, platform, product, year, tile, proxy,
                    doy_start=1, doy_end=-1,
                    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".",
-                   ruff=False, verbose=False,
-                   reconnection_attempts=5):
+                   verbose=False,
+                   reconnection_attempts=5,
+                   check_sizes=False):
 
     """Download MODIS products for a given tile, year & period of interest
 
@@ -212,13 +220,15 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         The URL to use. Shouldn't be changed, unless USGS change the server.
     out_dir: str
         The output directory. Will be create if it doesn't exist
-    ruff: Boolean
-        Check to see what files are already available and download them without
-        testing for file size etc.
     verbose: Boolean
         Whether to sprout lots of text out or not.
     reconnection_attempts: int, default 5
         Number of times to attempt to open HTTP Connection before giving up.
+    check_sizes : boolean, default False
+        If True then first retrieve remote file size to check against local file.
+        Only use on legacy dataset directories which were downloaded before 
+        13 October 2016, when code based switched to naming files in progress
+        with .part, rendering this option unnecessary.
 
     Returns
     -------
@@ -244,7 +254,8 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                                                      "%j/%Y")) for i in
              range(doy_start, doy_end)]
     url = "%s/%s/%s/" % (base_url, platform, product)
-    dates = parse_modis_dates(url, dates, product, out_dir, ruff=ruff)
+    dates = parse_modis_dates(url, dates, product, out_dir, 
+                check_sizes=check_sizes)
     
     count_reconn_attempts = 0
     while count_reconn_attempts <= reconnection_attempts:
@@ -257,7 +268,9 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                 s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
 
                 while len(dates) > 0:
+
                     date = dates.pop(0)
+
                     r = requests.get("%s/%s" % (url, date), verify=False)
                     for line in r.text.split("\n"):
 
@@ -273,33 +286,52 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
 
                             # Set download flag
                             download = True
-
-                            # Open stream to remote file
-                            r1 = s.request('get', the_url)
-                            r = s.get(r1.url, stream=True, timeout=(5,10))
-                            if not r.ok:
-                                raise IOError("Can't access... [%s]" % fname)
-                            # Get remote file size
-                            remote_file_size = int(r.headers['content-length'])
+                            r = None
 
                             # If local file present, check if it is complete
+                            # Incomplete files will still have .part suffix
                             if os.path.exists(os.path.join(out_dir, fname)):
-                                # Get local file size
-                                local_file_size = os.path.getsize(os.path.join( \
-                                    out_dir, fname ) )
-                                # Skip download if local and remote sizes match
-                                if remote_file_size == local_file_size:
-                                    download = False
-                                    if verbose:
-                                        LOG.info("File %s already present. Skipping" % fname)
+
+                                if check_sizes:
+                                    # Open link to remote file
+                                    r1 = s.request('get', the_url, timeout=(5,5))
+                                    r = s.get(r1.url, stream=True, timeout=(5,5))
+                                    if not r.ok:
+                                        raise IOError("Can't access... [%s]" % fname)
+                                    # Get remote file size
+                                    remote_file_size = int(r.headers['content-length'])
+
+                                    local_file_size = os.path.getsize(os.path.join( \
+                                        out_dir, fname ) )
+
+                                    # Skip download if local and remote sizes match
+                                    if remote_file_size == local_file_size:
+                                        download = False
+                                        if verbose:
+                                            LOG.info("File %s already present. Skipping" % fname)
+                                    else:
+                                        if verbose:
+                                            LOG.info("Local version of %s incomplete, will be overwritten." % fname)
+                                          
                                 else:
-                                    if verbose:
-                                        LOG.info("Local version of %s incomplete, will be overwritten." % fname)
-                                        
+                                    download = False
+
+
                             if download == True:
+
+                                # Open stream to remote file
+                                # Stream might have been opened above, check
+                                if r is None:
+                                    r1 = s.request('get', the_url, timeout=(5,5))
+                                    r = s.get(r1.url, stream=True, timeout=(5,5))
+                                    if not r.ok:
+                                        raise IOError("Can't access... [%s]" % fname)
+                                    # Get remote file size
+                                    remote_file_size = int(r.headers['content-length'])
+
                                 LOG.info("Starting download on %s(%d bytes) ..." %
                                          (os.path.join(out_dir, fname), remote_file_size))
-                                with open(os.path.join(out_dir, fname), 'wb') as fp:
+                                with open(os.path.join(out_dir, fname + '.part'), 'wb') as fp:
                                     for chunk in r.iter_content(chunk_size=CHUNKS):
                                         if chunk:
                                             fp.write(chunk)
@@ -307,6 +339,10 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                                     os.fsync(fp)
                                     if verbose:
                                         LOG.info("\tDone!")
+
+                                # Once download finished, remove .part suffix
+                                os.rename(os.path.join(out_dir, fname + '.part'),
+                                    os.path.join(out_dir, fname))
 
                             # Flag that this date+tile is processed
                             date_done = True
@@ -321,6 +357,13 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                     LOG.info("Completely finished downloading all there was")
 
                 return
+
+        except requests.exceptions.Timeout:
+            # Don't increment connection number
+            dates.insert(0, date)
+            if verbose:
+                LOG.info('Timeout error, opening new session')
+            continue
 
         except requests.exceptions.ConnectionError:
 
@@ -370,9 +413,9 @@ if __name__ == "__main__":
                       type=int, default=-1, help="Ending day of year (DoY)")
     parser.add_option('-r', '--proxy', action="store", dest="proxy",
                       type=str, default=None, help="HTTP proxy URL")
-    parser.add_option('-q', '--quick', action="store_true", dest="quick",
+    parser.add_option('-c', '--checksizes', action="store_true", dest="checksizes",
                       default=False,
-                      help="Quick check to see whether files are present")
+                      help="Compare size of local and remote files")
     (options, args) = parser.parse_args()
     if 'username' not in options.__dict__:
         parser.error("You need to provide a username! Sgrunt!")
@@ -391,4 +434,4 @@ if __name__ == "__main__":
                    options.tile, PROXY,
                    doy_start=options.doy_start, doy_end=options.doy_end,
                    out_dir=options.dir_out,
-                   verbose=options.verbose, ruff=options.quick)
+                   verbose=options.verbose, check_sizes=options.checksizes)
