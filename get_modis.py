@@ -245,60 +245,96 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
              range(doy_start, doy_end)]
     url = "%s/%s/%s/" % (base_url, platform, product)
     dates = parse_modis_dates(url, dates, product, out_dir, ruff=ruff)
-    them_urls = []
-    for date in dates:
-        r = requests.get("%s/%s" % (url, date), verify=False)
-        for line in r.text.split("\n"):
-            if line.find(tile) >= 0:
-                if line.find(".hdf") >= 0 > line.find(".hdf.xml"):
-                    fname = line.split("href=")[1].split(">")[0].strip('"')
-
-                    if not os.path.exists(os.path.join(out_dir, fname)):
-                        them_urls.append("%s/%s/%s" % (url, date, fname))
-                    else:
-                        if verbose:
-                            LOG.info("File %s already present. Skipping" % fname)
-
+    
     count_reconn_attempts = 0
     while count_reconn_attempts <= reconnection_attempts:
+        if verbose:
+            LOG.info("Session Attempt %d" % (count_reconn_attempts+1))
+
         try:
             with requests.Session() as s:
                 s.auth = (username, password)
                 s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
-                print(len(them_urls))
-                while len(them_urls) > 0:
-                    the_url = them_urls.pop(0)
-                    r1 = s.request('get', the_url)
-                    r = s.get(r1.url, stream=True, timeout=(5,10))
-                    if not r.ok:
-                        raise IOError("Can't start download... [%s]" % fname)
-                    file_size = int(r.headers['content-length'])
-                    fname = the_url.split("/")[-1]
-                    LOG.info("Starting download on %s(%d bytes) ..." %
-                             (os.path.join(out_dir, fname), file_size))
-                    with open(os.path.join(out_dir, fname), 'wb') as fp:
-                        for chunk in r.iter_content(chunk_size=CHUNKS):
-                            if chunk:
-                                fp.write(chunk)
-                        fp.flush()
-                        os.fsync(fp)
-                        if verbose:
-                            LOG.info("\tDone!")
-            if verbose:
-                LOG.info("Completely finished downloading all there was")
+
+                while len(dates) > 0:
+                    date = dates.pop(0)
+                    r = requests.get("%s/%s" % (url, date), verify=False)
+                    for line in r.text.split("\n"):
+
+                        # Set flag so that we can exit HTML loop when done
+                        date_done = False
+
+                        if (line.find(tile) >= 0) & \
+                            (line.find(".hdf") >= 0 > line.find(".hdf.xml")):
+
+                            # Find remote file name and URL
+                            fname = line.split("href=")[1].split(">")[0].strip('"')
+                            the_url = "%s/%s/%s" % (url, date, fname)
+
+                            # Set download flag
+                            download = True
+
+                            # Open stream to remote file
+                            r1 = s.request('get', the_url)
+                            r = s.get(r1.url, stream=True, timeout=(5,10))
+                            if not r.ok:
+                                raise IOError("Can't access... [%s]" % fname)
+                            # Get remote file size
+                            remote_file_size = int(r.headers['content-length'])
+
+                            # If local file present, check if it is complete
+                            if os.path.exists(os.path.join(out_dir, fname)):
+                                # Get local file size
+                                local_file_size = os.path.getsize(os.path.join( \
+                                    out_dir, fname ) )
+                                # Skip download if local and remote sizes match
+                                if remote_file_size == local_file_size:
+                                    download = False
+                                    if verbose:
+                                        LOG.info("File %s already present. Skipping" % fname)
+                                else:
+                                    if verbose:
+                                        LOG.info("Local version of %s incomplete, will be overwritten." % fname)
+                                        
+                            if download == True:
+                                LOG.info("Starting download on %s(%d bytes) ..." %
+                                         (os.path.join(out_dir, fname), remote_file_size))
+                                with open(os.path.join(out_dir, fname), 'wb') as fp:
+                                    for chunk in r.iter_content(chunk_size=CHUNKS):
+                                        if chunk:
+                                            fp.write(chunk)
+                                    fp.flush()
+                                    os.fsync(fp)
+                                    if verbose:
+                                        LOG.info("\tDone!")
+
+                            # Flag that this date+tile is processed
+                            date_done = True
+
+                        # Break out of remote HTML loop if date+tile processed
+                        if date_done == True:
+                            break
+
+
+                # Finished looping through dates with while
+                if verbose:
+                    LOG.info("Completely finished downloading all there was")
+
+                return
 
         except requests.exceptions.ConnectionError:
 
             # Increment number of reconnection attempts
             count_reconn_attempts += 1
 
-            # Put the most recent (failed) file back into the list
-            them_urls.insert(0, the_url)
+            # Put the most recent (failed) date back into the list
+            dates.insert(0, date)
 
             # Begin the re-connection process (unless max attempts reached)    
             continue
 
-        # If we get here then the download session has been successful
+        # If we manage to get here then the download session has been successful
+        # Break out of the session reconnect loop
         break
 
     # Raise error if download session failed
