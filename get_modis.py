@@ -170,7 +170,7 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
 def get_modisfiles(username, password, platform, product, year, tile, proxy,
                    doy_start=1, doy_end=-1,
                    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".",
-                   ruff=False, verbose=False):
+                   ruff=False, get_xml=False, verbose=False):
 
     """Download MODIS products for a given tile, year & period of interest
 
@@ -216,7 +216,9 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         testing for file size etc.
     verbose: Boolean
         Whether to sprout lots of text out or not.
-
+    get_xml: Boolean
+        Whether to get the XML metadata files or not. Someone uses them,
+        apparently ;-)
     Returns
     -------
     Nothing
@@ -247,8 +249,8 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         r = requests.get("%s/%s" % (url, date), verify=False)
         for line in r.text.split("\n"):
             if line.decode().find(tile) >= 0:
-                if line.decode().find(
-                        ".hdf") >= 0 > line.decode().find(".hdf.xml"):
+                if (line.decode().find(".hdf") >= 0) or \
+                        (get_xml and (line.decode().find(".hdf.xml")):
                     fname = line.decode().split("href=")[1].split(">")[0].strip('"')
 
                     if not os.path.exists(os.path.join(out_dir, fname)):
@@ -310,6 +312,9 @@ if __name__ == "__main__":
     parser.add_option('-q', '--quick', action="store_true", dest="quick",
                       default=False,
                       help="Quick check to see whether files are present")
+    parser.add_optn ('-x', '--xml', action="sture_true", dest="get_xml",
+                     default=False,
+                     help="Get the XML metadata files too.")
     (options, args) = parser.parse_args()
     if 'username' not in options.__dict__:
         parser.error("You need to provide a username! Sgrunt!")
@@ -328,4 +333,5 @@ if __name__ == "__main__":
                    options.tile, PROXY,
                    doy_start=options.doy_start, doy_end=options.doy_end,
                    out_dir=options.dir_out,
-                   verbose=options.verbose, ruff=options.quick)
+                   verbose=options.verbose, ruff=options.quick,
+                   get_xml=options.get_xml)
