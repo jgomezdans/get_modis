@@ -250,7 +250,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
         for line in r.text.split("\n"):
             if line.decode().find(tile) >= 0:
                 if (line.decode().find(".hdf") >= 0) or \
-                        (get_xml and (line.decode().find(".hdf.xml")):
+                        (get_xml and (line.decode().find(".hdf.xml"))):
                     fname = line.decode().split("href=")[1].split(">")[0].strip('"')
 
                     if not os.path.exists(os.path.join(out_dir, fname)):
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     parser.add_option('-q', '--quick', action="store_true", dest="quick",
                       default=False,
                       help="Quick check to see whether files are present")
-    parser.add_optn ('-x', '--xml', action="sture_true", dest="get_xml",
+    parser.add_option ('-x', '--xml', action="store_true", dest="get_xml",
                      default=False,
                      help="Get the XML metadata files too.")
     (options, args) = parser.parse_args()
