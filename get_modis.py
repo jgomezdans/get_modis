@@ -31,8 +31,8 @@ import requests
 from bs4 import BeautifulSoup
 
 
-__author__ = "J Gomez-Dans"
-__copyright__ = "Copyright 2013-2016 J Gomez-Dans"
+__author__ = "J Gomez-Dans & Andrew Tedstone"
+__copyright__ = "Copyright 2013-2016 J Gomez-Dans, portions 2016 Andrew Tedstone"
 __version__ = "1.3.2"
 __license__ = "GPLv3"
 __email__ = "j.gomez-dans@ucl.ac.uk"
@@ -76,6 +76,7 @@ EXIT STATUS
 AUTHOR
 
     J Gomez-Dans <j.gomez-dans@ucl.ac.uk>
+    Andrew Tedstone <a.j.tedstone@bristol.ac.uk>
     See also http://github.com/jgomezdans/get_modis/
 
 """
@@ -190,7 +191,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     for the relevant filename for the tile the user is interested in. This file
     is then downloaded in the directory specified by `out_dir`.
 
-    The function also checks to see if the selected remote file exists locally.
+    The function can also check if complete files exist locally.
     If it does, it checks that the remote and local file sizes are identical.
     If they are, file isn't downloaded, but if they are different, the remote
     file is downloaded.
