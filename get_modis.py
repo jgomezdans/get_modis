@@ -28,6 +28,7 @@ import logging
 import sys
 import fnmatch
 import requests
+from bs4 import BeautifulSoup
 
 
 __author__ = "J Gomez-Dans"
@@ -178,7 +179,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                    doy_start=1, doy_end=-1,
                    base_url="http://e4ftl01.cr.usgs.gov", out_dir=".",
                    verbose=False,
-                   reconnection_attempts=5,
+                   reconnection_attempts=200,
                    check_sizes=False):
 
     """Download MODIS products for a given tile, year & period of interest
@@ -264,97 +265,109 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
 
         try:
             with requests.Session() as s:
-                s.auth = (username, password)
                 s.mount(base_url, requests.adapters.HTTPAdapter(max_retries=5))
+
+                ## Login to the EarthData Service for this session
+                # First get an authenticity token
+                r = s.get('https://urs.earthdata.nasa.gov/')
+                parsed_html = BeautifulSoup(r.text, 'lxml')
+                token = parsed_html.body.find('input', attrs={'name':'authenticity_token'})['value']
+
+                # Now do the login, providing the token
+                r = s.post('https://urs.earthdata.nasa.gov/login', 
+                    data={'username':username, 'password':password, 'authenticity_token':token,
+                    'utf8':'&#x2713;'})
+                if not r.ok:
+                    raise IOError('Could not log in to EarthData server: %s' %r )
+                # Reset return object
+                r = None
 
                 while len(dates) > 0:
 
                     date = dates.pop(0)
 
-                    r = requests.get("%s/%s" % (url, date), verify=False)
+                    r = s.get("%s/%s" % (url, date), verify=False)
+                    download = False
                     for line in r.text.split("\n"):
-
-                        # Set flag so that we can exit HTML loop when done
-                        date_done = False
 
                         if (line.find(tile) >= 0) & \
                             (line.find(".hdf") >= 0 > line.find(".hdf.xml")):
 
                             # Find remote file name and URL
                             fname = line.split("href=")[1].split(">")[0].strip('"')
-                            the_url = "%s/%s/%s" % (url, date, fname)
+                            the_url = "%s%s/%s" % (url, date, fname)
 
                             # Set download flag
                             download = True
                             r = None
-
-                            # If local file present, check if it is complete
-                            # Incomplete files will still have .part suffix
-                            if os.path.exists(os.path.join(out_dir, fname)):
-
-                                if check_sizes:
-                                    # Open link to remote file
-                                    r1 = s.request('get', the_url, timeout=(5,5))
-                                    r = s.get(r1.url, stream=True, timeout=(5,5))
-                                    if not r.ok:
-                                        raise IOError("Can't access... [%s]" % fname)
-                                    # Get remote file size
-                                    remote_file_size = int(r.headers['content-length'])
-
-                                    local_file_size = os.path.getsize(os.path.join( \
-                                        out_dir, fname ) )
-
-                                    # Skip download if local and remote sizes match
-                                    if remote_file_size == local_file_size:
-                                        download = False
-                                        if verbose:
-                                            LOG.info("File %s already present. Skipping" % fname)
-                                    else:
-                                        if verbose:
-                                            LOG.info("Local version of %s incomplete, will be overwritten." % fname)
-                                          
-                                else:
-                                    download = False
-
-
-                            if download == True:
-
-                                # Open stream to remote file
-                                # Stream might have been opened above, check
-                                if r is None:
-                                    r1 = s.request('get', the_url, timeout=(5,5))
-                                    r = s.get(r1.url, stream=True, timeout=(5,5))
-                                    if not r.ok:
-                                        raise IOError("Can't access... [%s]" % fname)
-                                    # Get remote file size
-                                    remote_file_size = int(r.headers['content-length'])
-
-                                LOG.info("Starting download on %s(%d bytes) ..." %
-                                         (os.path.join(out_dir, fname), remote_file_size))
-                                with open(os.path.join(out_dir, fname + '.part'), 'wb') as fp:
-                                    for chunk in r.iter_content(chunk_size=CHUNKS):
-                                        if chunk:
-                                            fp.write(chunk)
-                                    fp.flush()
-                                    os.fsync(fp)
-                                    if verbose:
-                                        LOG.info("\tDone!")
-
-                                # Once download finished, remove .part suffix
-                                os.rename(os.path.join(out_dir, fname + '.part'),
-                                    os.path.join(out_dir, fname))
-
-                            # Flag that this date+tile is processed
-                            date_done = True
-
-                        # Break out of remote HTML loop if date+tile processed
-                        if date_done == True:
+                            # File found so break out of loop
                             break
+
+                    if not download:
+                        LOG.info('File not found for date: %s' % date)
+                        continue
+
+
+                    # If local file present, check if it is complete
+                    # Incomplete files will still have .part suffix
+                    rfile = None
+                    if os.path.exists(os.path.join(out_dir, fname)):
+
+                        if check_sizes:
+                            # Open link to remote file
+                            #r1 = s.request('get', the_url, timeout=(5,5))
+                            rfile = s.get(the_url, stream=True, timeout=(5,5))
+                            if not rfile.ok:
+                                raise IOError("Can't access... [%s]" % the_url)
+                            # Get remote file size
+                            remote_file_size = int(rfile.headers['content-length'])
+
+                            local_file_size = os.path.getsize(os.path.join( \
+                                out_dir, fname ) )
+
+                            # Skip download if local and remote sizes match
+                            if remote_file_size == local_file_size:
+                                download = False
+                                if verbose:
+                                    LOG.info("File %s already present. Skipping" % fname)
+                            else:
+                                if verbose:
+                                    LOG.info("Local version of %s incomplete, will be overwritten." % fname)
+                                  
+                        else:
+                            download = False
+
+
+                    if download:
+
+                        # Open stream to remote file
+                        # Stream might have been opened above, check
+                        if rfile is None:
+                            rfile = s.get(the_url, stream=True, timeout=(9, 9))
+                            if not rfile.ok:
+                                raise IOError("Can't access... [%s]" % the_url)
+                            # Get remote file size
+                            remote_file_size = int(rfile.headers['content-length'])
+
+                        LOG.info("Starting download on %s(%d bytes) ..." %
+                                 (os.path.join(out_dir, fname), remote_file_size))
+                        with open(os.path.join(out_dir, fname + '.part'), 'wb') as fp:
+                            for chunk in rfile.iter_content(chunk_size=CHUNKS):
+                                if chunk:
+                                    fp.write(chunk)
+                            #fp.flush() # disabled 2016/11/15, takes ages with no clear benefit
+                            #os.fsync(fp.fileno())
+                            if verbose:
+                                LOG.info("\tDone!")
+
+                        # Once download finished, remove .part suffix
+                        os.rename(os.path.join(out_dir, fname + '.part'),
+                            os.path.join(out_dir, fname))
 
 
                 # Finished looping through dates with while
                 if verbose:
-                    LOG.info("Completely finished downloading all there was")
+                    LOG.info("All downloads complete")
 
                 return
 
