@@ -105,7 +105,7 @@ def return_url(url):
     return html
 
 
-def parse_modis_dates ( url, dates, product, out_dir, check_sizes=False ):
+def parse_modis_dates ( url, dates, product, tile, out_dir, check_sizes=False ):
     """Parse returned MODIS dates.
 
     This function gets the dates listing for a given MODIS products, and
@@ -140,7 +140,7 @@ def parse_modis_dates ( url, dates, product, out_dir, check_sizes=False ):
     if not check_sizes:
         product = product.split(".")[0]
         already_here = fnmatch.filter(os.listdir(out_dir),
-                                      "%s*hdf" % product)
+                                      "%s*%s*hdf" % (product, tile))
         already_here_dates = [x.split(".")[-5][1:]
                               for x in already_here]
 
@@ -256,7 +256,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                                                      "%j/%Y")) for i in
              range(doy_start, doy_end)]
     url = "%s/%s/%s/" % (base_url, platform, product)
-    dates = parse_modis_dates(url, dates, product, out_dir, 
+    dates = parse_modis_dates(url, dates, product, tile, out_dir, 
                 check_sizes=check_sizes)
     
     count_reconn_attempts = 0
