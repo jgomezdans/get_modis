@@ -28,6 +28,9 @@ import logging
 import sys
 import fnmatch
 import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 __author__ = "J Gomez-Dans"
@@ -246,24 +249,26 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     dates = parse_modis_dates(url, dates, product, out_dir, ruff=ruff)
     them_urls = []
     for date in dates:
-        r = requests.get("%s/%s" % (url, date), verify=False)
+        r = requests.get("%s%s" % (url, date), verify=False)
         for line in r.text.split("\n"):
             if line.decode().find(tile) >= 0:
-                if (line.decode().find(".hdf") >= 0) or \
-                        (get_xml and (line.decode().find(".hdf.xml"))):
-                    fname = line.decode().split("href=")[1].split(">")[0].strip('"')
-
-                    if not os.path.exists(os.path.join(out_dir, fname)):
-                        them_urls.append("%s/%s/%s" % (url, date, fname))
+                if line.decode().find(".hdf")  >= 0:
+                    fname = line.decode().split("href=")[1].split(">")[0].strip('"')                    
+                    if fname.endswith(".hdf.xml") and not get_xml:
+                        pass
                     else:
-                        if verbose:
-                            LOG.info("File %s already present. Skipping" % fname)
-
+                        if not os.path.exists(os.path.join(out_dir, fname)):
+                            them_urls.append("%s/%s/%s" % (url, date, fname))
+                        else:
+                            if verbose:
+                                LOG.info("File %s already present. Skipping" % fname)
+            
     with requests.Session() as s:
         s.auth = (username, password)
         for the_url in them_urls:
             r1 = s.request('get', the_url)
             r = s.get(r1.url, stream=True)
+
             if not r.ok:
                 raise IOError("Can't start download... [%s]" % fname)
             file_size = int(r.headers['content-length'])
