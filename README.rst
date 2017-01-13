@@ -17,8 +17,7 @@ See more `here <http://jgomezdans.github.io/downloading-modis-data-with-python.h
 Usage
 ------
 
-This is a command line tool. It has only been tested on Linux, but should also work with Windows. There are a number of options that can be used, and you can get a list of them
-issuing the ``-h`` or ``--help`` commands:
+This is a command line tool. It has only been tested on Linux, but should also work with Windows. There are a number of options that can be used, and you can get a list of them issuing the ``-h`` or ``--help`` commands. Also note that as of summery 2016, you **must have a username and password** pair to access the server. If you haven't got one, you can get it `here <https://earthdata.nasa.gov/>`_. You will also need to allow your user account to access the USGS MODIS archive (you only need to do this once).
 
 .. code-block: bash
 
@@ -28,7 +27,10 @@ issuing the ``-h`` or ``--help`` commands:
       
     SYNOPSIS
         
-    ./get_modis.py [-h,--help] [--verbose, -v] [--platform=PLATFORM, -s PLATFORM]    [--proxy=PROXY -p PROXY]     [--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE]     [--year=YEAR, -y YEAR] [--output=DIR_OUT, -o DIR_OUT]     [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
+    ./get_modis.py [-h,--help] [--username=USERNAME, -u USERNAME] [--password=PASSWORD, -P PASSWORD] 
+    [--verbose, -v] [--platform=PLATFORM, -s PLATFORM]    [--proxy=PROXY -p PROXY]     
+    [--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE]     [--year=YEAR, -y YEAR] 
+    [--output=DIR_OUT, -o DIR_OUT]     [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
 
     DESCRIPTION
 
@@ -37,7 +39,8 @@ issuing the ``-h`` or ``--help`` commands:
     products for a given year, it only requires the product names (including the 
     collection number), the year, the MODIS reference tile and additionally, where
     to save the data to, and whether to verbose. The user may also select a 
-    temporal period in terms of days of year.
+    temporal period in terms of days of year.  Note that as of summer 2016, NASA
+    requires that all downloads are identified with a username and password.
 
     EXAMPLES
 

@@ -34,19 +34,18 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 __author__ = "J Gomez-Dans"
-__copyright__ = "Copyright 2013-2016 J Gomez-Dans"
-__version__ = "1.3.2"
+__copyright__ = "Copyright 2013-2017 J Gomez-Dans"
+__version__ = "1.3.3"
 __license__ = "GPLv3"
 __email__ = "j.gomez-dans@ucl.ac.uk"
 
 """
 SYNOPSIS
 
-./get_modis.py [-h,--help] [--verbose, -v] [--platform=PLATFORM, -s PLATFORM]\
-    [--proxy=PROXY -p PROXY] \
-    [--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE] \
-    [--year=YEAR, -y YEAR] [--output=DIR_OUT, -o DIR_OUT] \
-    [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
+./get_modis.py [-h,--help] [--username=USERNAME, -u USERNAME] [--password=PASSWORD, -P PASSWORD] 
+[--verbose, -v] [--platform=PLATFORM, -s PLATFORM]    [--proxy=PROXY -p PROXY]     
+[--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE]     [--year=YEAR, -y YEAR] 
+[--output=DIR_OUT, -o DIR_OUT]     [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
 
 DESCRIPTION
 
@@ -55,7 +54,8 @@ transport. This program is able to download daily, monthly, 8-daily, etc
 products for a given year, it only requires the product names (including the
 collection number), the year, the MODIS reference tile and additionally, where
 to save the data to, and whether to verbose. The user may also select a
-temporal period in terms of days of year.
+temporal period in terms of days of year. Note that as of summer 2016, NASA
+requires that all downloads are identified with a username and password.
 
 EXAMPLES
 
