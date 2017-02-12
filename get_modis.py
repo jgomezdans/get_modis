@@ -270,7 +270,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
             r = s.get(r1.url, stream=True)
 
             if not r.ok:
-                raise IOError("Can't start download... [%s]" % fname)
+                raise IOError("Can't start download... [%s]" % the_url)
             file_size = int(r.headers['content-length'])
             fname = the_url.split("/")[-1]
             LOG.info("Starting download on %s(%d bytes) ..." %
