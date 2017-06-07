@@ -93,19 +93,21 @@ HEADERS = { 'User-Agent' : 'get_modis Python %s' % __version__ }
 CHUNKS = 65536
 
 
-def return_url(url):
+def return_url(url, s):
     the_day_today = time.asctime().split()[0]
     the_hour_now = int(time.asctime().split()[3].split(":")[0])
-    if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
-        LOG.info("Sleeping for %d hours... Yawn!" % (18 - the_hour_now))
-        time.sleep(60 * 60 * (18 - the_hour_now))
+    # if the_day_today == "Wed" and 14 <= the_hour_now <= 17:
+    #     LOG.info("Sleeping for %d hours... Yawn!" % (18 - the_hour_now))
+    #     time.sleep(60 * 60 * (18 - the_hour_now))
 
-    req = urllib2.Request("%s" % (url), None, HEADERS)
-    html = urllib2.urlopen(req).readlines()
-    return html
+    r = s.get(url)
+    parsed_html = BeautifulSoup(r.text, 'lxml')
+    #req = urllib2.Request("%s" % (url), None, HEADERS)
+    #html = urllib2.urlopen(req).readlines()
+    return parsed_html
 
 
-def parse_modis_dates ( url, dates, product, tile, out_dir, check_sizes=False ):
+def parse_modis_dates (s, url, dates, product, tile, out_dir, check_sizes=False ):
     """Parse returned MODIS dates.
 
     This function gets the dates listing for a given MODIS products, and
@@ -144,31 +146,29 @@ def parse_modis_dates ( url, dates, product, tile, out_dir, check_sizes=False ):
         already_here_dates = [x.split(".")[-5][1:]
                               for x in already_here]
 
-    html = return_url(url)
+    html = return_url(url, s)
+    links = html.body.find_all('a')
 
     available_dates = []
-    for line in html:
+    for link in links:
 
-        if line.decode().find("href") >= 0 and \
-                        line.decode().find("[DIR]") >= 0:
-            # Points to a directory
-            the_date = line.decode().split('href="')[1].split('"')[0].strip("/")
-            
-            if not check_sizes:
-                try:
-                    modis_date = time.strftime("%Y%j",
-                                               time.strptime(the_date,
-                                                             "%Y.%m.%d"))
-                except ValueError:
-                    continue
-                if modis_date in already_here_dates:
-                    continue
-                else:
-                    available_dates.append(the_date)
-
+        the_date = link.get('href')[:-1]
+        
+        if not check_sizes:
+            try:
+                modis_date = time.strftime("%Y%j",
+                                           time.strptime(the_date,
+                                                         "%Y.%m.%d"))
+            except ValueError:
+                continue
+            if modis_date in already_here_dates:
+                continue
             else:
                 available_dates.append(the_date)
-            
+
+        else:
+            available_dates.append(the_date)
+
     dates = set(dates)
     available_dates = set(available_dates)
     suitable_dates = list(dates.intersection(available_dates))
@@ -256,8 +256,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                                                      "%j/%Y")) for i in
              range(doy_start, doy_end)]
     url = "%s/%s/%s/" % (base_url, platform, product)
-    dates = parse_modis_dates(url, dates, product, tile, out_dir, 
-                check_sizes=check_sizes)
+    dates_available = None
     
     count_reconn_attempts = 0
     while count_reconn_attempts <= reconnection_attempts:
@@ -280,12 +279,18 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                     'utf8':'&#x2713;'})
                 if not r.ok:
                     raise IOError('Could not log in to EarthData server: %s' %r )
+                else:
+                    print('LOGGED IN')
                 # Reset return object
                 r = None
 
-                while len(dates) > 0:
+                if dates_available is None:
+                    dates_available = parse_modis_dates(s, url, dates, product, tile, out_dir, 
+                        check_sizes=check_sizes)
 
-                    date = dates.pop(0)
+                while len(dates_available) > 0:
+
+                    date = dates_available.pop(0)
 
                     r = s.get("%s/%s" % (url, date), verify=False)
                     download = False
@@ -385,7 +390,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
             count_reconn_attempts += 1
 
             # Put the most recent (failed) date back into the list
-            dates.insert(0, date)
+            dates_available.insert(0, date)
 
             # Begin the re-connection process (unless max attempts reached)    
             continue
@@ -430,12 +435,15 @@ if __name__ == "__main__":
     parser.add_option('-c', '--checksizes', action="store_true", dest="checksizes",
                       default=False,
                       help="Compare size of local and remote files")
+    parser.add_option('-d', '--baseurl', action="store", dest="baseurl",
+                      default='http://e4ftl01.cr.usgs.gov',
+                      help="Specify base URL to download from")
     (options, args) = parser.parse_args()
     if 'username' not in options.__dict__:
         parser.error("You need to provide a username! Sgrunt!")
     if 'password' not in options.__dict__:
         parser.error("You need to provide a password! Sgrunt!")
-    if not (options.platform in ["MOLA", "MOTA", "MOLT"]):
+    if not (options.platform in ["MOLA", "MOTA", "MOLT", "MOST"]):
         LOG.fatal("`platform` has to be one of MOLA, MOTA, MOLT")
         sys.exit(-1)
     if options.proxy is not None:
@@ -448,4 +456,5 @@ if __name__ == "__main__":
                    options.tile, PROXY,
                    doy_start=options.doy_start, doy_end=options.doy_end,
                    out_dir=options.dir_out,
-                   verbose=options.verbose, check_sizes=options.checksizes)
+                   verbose=options.verbose, check_sizes=options.checksizes,
+                   base_url=options.baseurl)
