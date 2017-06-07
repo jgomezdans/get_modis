@@ -1,7 +1,7 @@
 get_modis
 ==========
 :Info: MODIS data product granule downloader
-:Author: J Gomez-Dans <j.gomez-dans@ucl.ac.uk>
+:Author: J Gomez-Dans <j.gomez-dans@ucl.ac.uk>, Andrew Tedstone <a.j.tedstone@bristol.ac.uk>
 :Date: $Date: 2013-06-17 17:00:00 +0000  $
 :Description: README file
 
@@ -58,6 +58,7 @@ issuing the ``-h`` or ``--help`` commands:
     AUTHOR
 
         J Gomez-Dans <j.gomez-dans@ucl.ac.uk>
+        Andrew Tedstone <a.j.tedstone@bristol.ac.uk>
         See also http://github.com/jgomezdans/get_modis/
 
 
@@ -82,11 +83,13 @@ issuing the ``-h`` or ``--help`` commands:
     --proxy=PROXY, -r PROXY
                             HTTP proxy URL
     --quick, -q             Quick check to see whether files are present
+    --baseurl, -d           Base URL to download from (default: USGS server)
     
 Useful things to bear in mind:
 
-* The platform **MUST** be one of ``MOLA`` (Aqua), ``MOLT`` (Terra) or ``MOTA`` (Combined).
-* The product must have an indication of the collection follwing the product name. i.e. ``MCD45A1.005``)
+* The platform **MUST** be one of ``MOLA`` (Aqua), ``MOLT`` (Terra) or ``MOTA`` (Combined) for USGS-served products (default).
+* N.b. Platform **MUST** be set to ``MOST`` for NSIDC-served products, available by setting --baseurl to https://n5eil01u.ecs.nsidc.org.
+* The product must have an indication of the collection following the product name. i.e. ``MCD45A1.005``)
 * The ``--begin`` and ``--end`` flags are optional, and yu can ignore them if you just want the complete year
 * Use the ``--proxy`` option to set the required proxy. It should be read from the environment variable, but this is added flexiblity
 
