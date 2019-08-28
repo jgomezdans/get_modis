@@ -42,9 +42,9 @@ __email__ = "j.gomez-dans@ucl.ac.uk"
 """
 SYNOPSIS
 
-./get_modis.py [-h,--help] [--username=USERNAME, -u USERNAME] [--password=PASSWORD, -P PASSWORD] 
-[--verbose, -v] [--platform=PLATFORM, -s PLATFORM]    [--proxy=PROXY -p PROXY]     
-[--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE]     [--year=YEAR, -y YEAR] 
+./get_modis.py [-h,--help] [--username=USERNAME, -u USERNAME] [--password=PASSWORD, -P PASSWORD]
+[--verbose, -v] [--platform=PLATFORM, -s PLATFORM]    [--proxy=PROXY -p PROXY]
+[--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE]     [--year=YEAR, -y YEAR]
 [--output=DIR_OUT, -o DIR_OUT]     [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
 
 DESCRIPTION
@@ -251,9 +251,9 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     for date in dates:
         r = requests.get("%s%s" % (url, date), verify=False)
         for line in r.text.split("\n"):
-            if line.decode().find(tile) >= 0:
-                if line.decode().find(".hdf")  >= 0:
-                    fname = line.decode().split("href=")[1].split(">")[0].strip('"')                    
+            if line.find(tile) >= 0:
+                if line.find(".hdf")  >= 0:
+                    fname = line.split("href=")[1].split(">")[0].strip('"')
                     if fname.endswith(".hdf.xml") and not get_xml:
                         pass
                     else:
@@ -262,7 +262,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
                         else:
                             if verbose:
                                 LOG.info("File %s already present. Skipping" % fname)
-            
+
     with requests.Session() as s:
         s.auth = (username, password)
         for the_url in them_urls:
