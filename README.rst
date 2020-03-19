@@ -27,9 +27,9 @@ issuing the ``-h`` or ``--help`` commands:
 
 An example command to download version 6 of the MOD10A1 product, held at the NSIDC, looks like this:
 
-..code-block: bash
+.. code-block: bash
     
-    % get_modis.py -u <earthdata_username> -P <earthdata_password> -s MOST -l NSIDC -t h16v02 -b 200 -e 202 -y 2016 -v -p MOD10A1.006
+    $ get_modis.py -u <earthdata_username> -P <earthdata_password> -s MOST -l NSIDC -t h16v02 -b 200 -e 202 -y 2016 -v -p MOD10A1.006
 
 You will need a NASA EarthData login to use this tool.
 
