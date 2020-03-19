@@ -95,7 +95,7 @@ EARTHDATA_SSO_PORTAL = 'https://urs.earthdata.nasa.gov/'
 EARTHDATA_SSO_LOGIN  = 'https://urs.earthdata.nasa.gov/login'
 
 DATA_PROVIDERS = {
-    'USGS': 'http://e4ftl01.cr.usgs.gov',
+    'USGS': 'https://e4ftl01.cr.usgs.gov',
     'NSIDC': 'https://n5eil01u.ecs.nsidc.org'
 }
 DEFAULT_DATA_PROVIDER = 'USGS'
@@ -473,8 +473,6 @@ if __name__ == "__main__":
                       existing --providers. If this parameter is specified then \
                       it will override any choice made for --provider.")
     args = parser.parse_args()
-
-    print(args)
     
     if not (args.platform in ["MOLA", "MOTA", "MOLT", "MOST"]):
         LOG.fatal("Unknown `platform`.")
