@@ -1,7 +1,7 @@
 get_modis
 ==========
 :Info: MODIS data product granule downloader
-:Author: J Gomez-Dans <j.gomez-dans@ucl.ac.uk>, Andrew Tedstone <a.j.tedstone@bristol.ac.uk>
+:Author: J Gomez-Dans <j.gomez-dans@ucl.ac.uk>, Andrew Tedstone <andrew.tedstone@unifr.ch>
 :Date: $Date: 2013-06-17 17:00:00 +0000  $
 :Description: README file
 
@@ -10,7 +10,7 @@ Description
 
 This repository contains a Python script (and executable) that allows one to download MODIS data granules for different products and periods. 
 
-The code is quite simple and generic, and should work with most standard Python installations.
+The code is quite simple and generic but requires at least a couple of specific libraries not usually available by default: Beautiful Soup (conda-forge: `bs4`) and lxml (conda-forge: `lxml`).
 
 See more `here <http://jgomezdans.github.io/downloading-modis-data-with-python.html>`_.
 
@@ -23,72 +23,20 @@ issuing the ``-h`` or ``--help`` commands:
 .. code-block: bash
 
     $ ./get_modis.py -h
-    Usage
-    =====
-      
-    SYNOPSIS
-        
-    ./get_modis.py [-h,--help] [--verbose, -v] [--platform=PLATFORM, -s PLATFORM]    [--proxy=PROXY -p PROXY]     [--product=PRODUCT, -p PRODUCT] [--tile=TILE, -t TILE]     [--year=YEAR, -y YEAR] [--output=DIR_OUT, -o DIR_OUT]     [--begin=DOY_START, -b DOY_START] [--end=DOY_END, -e DOY_END]
-
-    DESCRIPTION
-
-    A program to download MODIS data from the USGS website using the HTTP
-    transport. This program is able to download daily, monthly, 8-daily, etc 
-    products for a given year, it only requires the product names (including the 
-    collection number), the year, the MODIS reference tile and additionally, where
-    to save the data to, and whether to verbose. The user may also select a 
-    temporal period in terms of days of year.
-
-    EXAMPLES
-
-        The following example downloads daily surface reflectance from the TERRA 
-        platform for tile h17v04 for 2004, between DoY 153 and 243:
-        
-        $ ./get_modis.py -v -p MOD09GA.005 -s MOLT -y 2004 -t h17v04 -o /tmp/         -b 153 -e 243
-        
-        The script will also work with monthly or 8-daily composites. Here's how 
-        you download the monthly MCD45A1 (burned area) product for the same period:
-        
-        $ ./get_modis.py -v -p MCD45A1.005 -s MOTA -y 2004 -t h17v04 -o /tmp/         -b 153 -e 243
-            
-
-    EXIT STATUS
-        No exit status yet, can't be bothered.
-
-    AUTHOR
-
-        J Gomez-Dans <j.gomez-dans@ucl.ac.uk>
-        Andrew Tedstone <a.j.tedstone@bristol.ac.uk>
-        See also http://github.com/jgomezdans/get_modis/
 
 
+An example command to download version 6 of the MOD10A1 product, held at the NSIDC, looks like this:
 
-    Options
-    =======
-    --help, -h              show this help message and exit
-    --verbose, -v           verbose output
-    --platform=PLATFORM, -s PLATFORM
-                            Platform type: MOLA, MOLT or MOTA
-    --product=PRODUCT, -p PRODUCT
-                            MODIS product name with collection tag at the end
-                            (e.g. MOD09GA.005)
-    --tile=TILE, -t TILE    Required tile (h17v04, for example)
-    --year=YEAR, -y YEAR    Year of interest
-    --output=DIR_OUT, -o DIR_OUT
-                            Output directory
-    --begin=DOY_START, -b DOY_START
-                            Starting day of year (DoY)
-    --end=DOY_END, -e DOY_END
-                            Ending day of year (DoY)
-    --proxy=PROXY, -r PROXY
-                            HTTP proxy URL
-    --quick, -q             Quick check to see whether files are present
-    --baseurl, -d           Base URL to download from (default: USGS server)
+..code-block: bash
     
+    % get_modis.py -u <earthdata_username> -P <earthdata_password> -s MOST -l NSIDC -t h16v02 -b 200 -e 202 -y 2016 -v -p MOD10A1.006
+
+You will need a NASA EarthData login to use this tool.
+
 Useful things to bear in mind:
 
-* The platform **MUST** be one of ``MOLA`` (Aqua), ``MOLT`` (Terra) or ``MOTA`` (Combined) for USGS-served products (default).
-* N.b. Platform **MUST** be set to ``MOST`` for NSIDC-served products, available by setting --baseurl to https://n5eil01u.ecs.nsidc.org.
+* The platform is one of ``MOLA`` (Aqua), ``MOLT`` (Terra) or ``MOTA`` (Combined) for USGS-served products (default).
+* To download products from NSIDC user `-l NSIDC` or `--provider=NSIDC`.
 * The product must have an indication of the collection following the product name. i.e. ``MCD45A1.005``)
 * The ``--begin`` and ``--end`` flags are optional, and yu can ignore them if you just want the complete year
 * Use the ``--proxy`` option to set the required proxy. It should be read from the environment variable, but this is added flexiblity
