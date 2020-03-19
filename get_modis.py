@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # get_modis A MODIS land product downloading tool
-# Copyright (c) 2013-2016 J Gomez-Dans. All rights reserved.
+# Copyright (c) 2013-2016 J Gomez-Dans, 2016, 2020 Andrew Tedstone. All rights reserved.
 #
 # This file is part of get_modis.
 #
@@ -13,10 +13,8 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with brdf_filter.  If not, see <http://www.gnu.org/licenses/>.
-import optparse
+
+import argparse
 import os
 try:
     import urllib.request as urllib2
@@ -33,9 +31,9 @@ from bs4 import BeautifulSoup
 
 __author__ = "J Gomez-Dans & Andrew Tedstone"
 __copyright__ = "Copyright 2013-2016 J Gomez-Dans, portions 2016 Andrew Tedstone"
-__version__ = "1.3.2"
+__version__ = "1.4.0"
 __license__ = "GPLv3"
-__email__ = "j.gomez-dans@ucl.ac.uk"
+__email__ = "j.gomez-dans@ucl.ac.uk; andrew.tedstone@unifr.ch"
 
 """
 SYNOPSIS
@@ -91,6 +89,17 @@ LOG.setLevel( logging.INFO )
 HEADERS = { 'User-Agent' : 'get_modis Python %s' % __version__ }
 
 CHUNKS = 65536
+
+# ------------------------------------------------------------------------------
+EARTHDATA_SSO_PORTAL = 'https://urs.earthdata.nasa.gov/'
+EARTHDATA_SSO_LOGIN  = 'https://urs.earthdata.nasa.gov/login'
+
+DATA_PROVIDERS = {
+    'USGS': 'http://e4ftl01.cr.usgs.gov',
+    'NSIDC': 'https://n5eil01u.ecs.nsidc.org'
+}
+DEFAULT_DATA_PROVIDER = 'USGS'
+#-------------------------------------------------------------------------------
 
 
 def return_url(url, s):
@@ -178,7 +187,7 @@ def parse_modis_dates (s, url, dates, product, tile, out_dir, check_sizes=False 
 
 def get_modisfiles(username, password, platform, product, year, tile, proxy,
                    doy_start=1, doy_end=-1,
-                   base_url="http://e4ftl01.cr.usgs.gov", out_dir=".",
+                   base_url=DATA_PROVIDERS[DEFAULT_DATA_PROVIDER], out_dir=".",
                    verbose=False,
                    reconnection_attempts=200,
                    check_sizes=False):
@@ -269,20 +278,27 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
 
                 ## Login to the EarthData Service for this session
                 # First get an authenticity token
-                r = s.get('https://urs.earthdata.nasa.gov/')
+                r = s.get(EARTHDATA_SSO_PORTAL)
                 parsed_html = BeautifulSoup(r.text, 'lxml')
                 token = parsed_html.body.find('input', attrs={'name':'authenticity_token'})['value']
 
                 # Now do the login, providing the token
-                r = s.post('https://urs.earthdata.nasa.gov/login', 
+                r = s.post(EARTHDATA_SSO_LOGIN, 
                     data={'username':username, 'password':password, 'authenticity_token':token,
                     'utf8':'&#x2713;'})
                 if not r.ok:
                     raise IOError('Could not log in to EarthData server: %s' %r )
-                else:
+
+                check_login = BeautifulSoup(r.text, 'lxml')
+                check_login = check_login.body.find('div', attrs={'class':'eui-banner--danger'})
+                if check_login is None:
                     print('LOGGED IN')
+                else:
+                    raise IOError('Could not log into EarthData server: %s' %check_login)
+
                 # Reset return object
                 r = None
+
 
                 if dates_available is None:
                     dates_available = parse_modis_dates(s, url, dates, product, tile, out_dir, 
@@ -406,55 +422,82 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
 
 
 if __name__ == "__main__":
-    parser = optparse.OptionParser(formatter=optparse.TitledHelpFormatter(),
-                                   usage=globals()['__doc__'])
-    parser.add_option('-u', '--username', action="store", dest="username",
-                      help="EarthData username")
-    parser.add_option('-P', '--password', action="store", dest="password",
-                      help="EarthData password")
-    parser.add_option('-v', '--verbose', action='store_true',
+    parser = argparse.ArgumentParser(description="A program to download MODIS data \
+        using HTTP \
+        transport. This program is able to download daily, monthly, 8-daily, etc \
+        products for a given year, it only requires the product names (including the \
+        collection number), the year, the MODIS reference tile and additionally, where \
+        to save the data to, and whether to verbose. The user may also select a \
+        temporal period in terms of days of year.")
+
+    parser.add_argument('-u', '--username', dest="username",
+                      help="EarthData username", 
+                      required=True)
+    parser.add_argument('-P', '--password',dest="password",
+                      help="EarthData password", 
+                      required=True)
+    parser.add_argument('-v', '--verbose', action='store_true',
                       default=False, help='verbose output')
-    parser.add_option('-s', '--platform', action='store', dest="platform",
-                      type=str, help='Platform type: MOLA, MOLT or MOTA')
-    parser.add_option('-p', '--product', action='store', dest="product",
+    parser.add_argument('-s', '--platform', action='store', dest="platform",
+                      type=str, help='Platform type: MOLA, MOLT, MOTA or MOST', 
+                      required=True)
+    parser.add_argument('-p', '--product', dest="product",
                       type=str,
                       help="MODIS product name with collection tag at the end " +
-                           "(e.g. MOD09GA.005)")
-    parser.add_option('-t', '--tile', action="store", dest="tile",
-                      type=str, help="Required tile (h17v04, for example)")
-    parser.add_option("-y", "--year", action="store", dest="year",
-                      type=int, help="Year of interest")
-    parser.add_option('-o', '--output', action="store", dest="dir_out",
+                           "(e.g. MOD09GA.005)",
+                      required=True)
+    parser.add_argument('-t', '--tile', dest="tile",
+                      type=str, help="Required tile (h17v04, for example)",
+                      required=True)
+    parser.add_argument("-y", "--year", dest="year",
+                      type=int, help="Year of interest",
+                      required=True)
+    parser.add_argument('-o', '--output', dest="dir_out",
                       default=".", type=str, help="Output directory")
-    parser.add_option('-b', '--begin', action="store", dest="doy_start",
+    parser.add_argument('-b', '--begin', dest="doy_start",
                       default=1, type=int, help="Starting day of year (DoY)")
-    parser.add_option('-e', '--end', action="store", dest="doy_end",
+    parser.add_argument('-e', '--end', dest="doy_end",
                       type=int, default=-1, help="Ending day of year (DoY)")
-    parser.add_option('-r', '--proxy', action="store", dest="proxy",
+    parser.add_argument('-r', '--proxy', dest="proxy",
                       type=str, default=None, help="HTTP proxy URL")
-    parser.add_option('-c', '--checksizes', action="store_true", dest="checksizes",
+    parser.add_argument('-c', '--checksizes', action="store_true", dest="checksizes",
                       default=False,
                       help="Compare size of local and remote files")
-    parser.add_option('-d', '--baseurl', action="store", dest="baseurl",
-                      default='http://e4ftl01.cr.usgs.gov',
-                      help="Specify base URL to download from")
-    (options, args) = parser.parse_args()
-    if 'username' not in options.__dict__:
-        parser.error("You need to provide a username! Sgrunt!")
-    if 'password' not in options.__dict__:
-        parser.error("You need to provide a password! Sgrunt!")
-    if not (options.platform in ["MOLA", "MOTA", "MOLT", "MOST"]):
-        LOG.fatal("`platform` has to be one of MOLA, MOTA, MOLT")
+    parser.add_argument('-l', '--provider', dest="provider",
+                      default='USGS',
+                      help='Specify a data provider: one of USGS, NSIDC.')
+    parser.add_argument('-d', '--baseurl', dest="baseurl",
+                      default=None,
+                      help="Specify base URL to download from. Only needed in the \
+                      case that your data are not stored with one of the \
+                      existing --providers. If this parameter is specified then \
+                      it will override any choice made for --provider.")
+    args = parser.parse_args()
+
+    print(args)
+    
+    if not (args.platform in ["MOLA", "MOTA", "MOLT", "MOST"]):
+        LOG.fatal("Unknown `platform`.")
         sys.exit(-1)
-    if options.proxy is not None:
+    if not (args.provider in DATA_PROVIDERS):
+        LOG.fatal("`Unknown `provider`.")
+    
+    # If a baseurl is provided then allow it to override the data provider.
+    if args.baseurl is None:
+        baseurl = DATA_PROVIDERS[args.provider]
+    else:
+        baseurl = args.baseurl
+
+    if args.proxy is not None:
         PROXY = {'http': options.proxy}
     else:
         PROXY = None
 
-    get_modisfiles(options.username, options.password, options.platform,
-                   options.product, options.year,
-                   options.tile, PROXY,
-                   doy_start=options.doy_start, doy_end=options.doy_end,
-                   out_dir=options.dir_out,
-                   verbose=options.verbose, check_sizes=options.checksizes,
-                   base_url=options.baseurl)
+
+    get_modisfiles(args.username, args.password, args.platform,
+                   args.product, args.year,
+                   args.tile, PROXY,
+                   doy_start=args.doy_start, doy_end=args.doy_end,
+                   out_dir=args.dir_out,
+                   verbose=args.verbose, check_sizes=args.checksizes,
+                   base_url=baseurl)
