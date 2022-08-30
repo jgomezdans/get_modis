@@ -172,7 +172,7 @@ def parse_modis_dates ( url, dates, product, out_dir, ruff=False ):
 
 def get_modisfiles(username, password, platform, product, year, tile, proxy,
                    doy_start=1, doy_end=-1,
-                   base_url="http://e4ftl01.cr.usgs.gov", out_dir=".",
+                   base_url="https://e4ftl01.cr.usgs.gov", out_dir=".",
                    ruff=False, get_xml=False, verbose=False):
 
     """Download MODIS products for a given tile, year & period of interest
@@ -266,7 +266,7 @@ def get_modisfiles(username, password, platform, product, year, tile, proxy,
     with requests.Session() as s:
         s.auth = (username, password)
         for the_url in them_urls:
-            r1 = s.request('get', the_url)
+            r1 = requests.get(the_url)
             r = s.get(r1.url, stream=True)
 
             if not r.ok:
