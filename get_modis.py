@@ -329,7 +329,9 @@ if __name__ == "__main__":
         LOG.fatal("`platform` has to be one of MOLA, MOTA, MOLT")
         sys.exit(-1)
     if options.proxy is not None:
-        PROXY = {'http': options.proxy}
+        PROXY = {'http': options.proxy,
+                 'https': options.proxy
+                 }
     else:
         PROXY = None
 
